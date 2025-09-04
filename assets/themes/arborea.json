@@ -1,5 +1,11 @@
 {
-    "name": "Arborea Vibrant",
+    "name": "Arborea",
+    "gradientColors": [
+        "#5D62A1",
+        "#E2D2FA",
+        "#FFEC80",
+        "#FFC72E"
+    ],
     "seed": "#992E2E",
     "coreColors": {
         "primary": "#992E2E",

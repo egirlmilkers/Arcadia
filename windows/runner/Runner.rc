@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "arcadia" "\0"
+            VALUE "CompanyName", "EGirlMilkers" "\0"
+            VALUE "FileDescription", "Arcadia" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "arcadia" "\0"
+            VALUE "InternalName", "Arcadia" "\0"
             VALUE "LegalCopyright", "Copyright © 2025 EGirlMilkers (SoniaNvm) All rights reserved." "\0"
-            VALUE "OriginalFilename", "arcadia.exe" "\0"
-            VALUE "ProductName", "arcadia" "\0"
+            VALUE "OriginalFilename", "Arcadia.exe" "\0"
+            VALUE "ProductName", "Arcadia" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

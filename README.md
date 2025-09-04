@@ -1,3 +1,3 @@
-# arcadia
+# Arcadia
 
 A new Flutter project.

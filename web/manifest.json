@@ -1,6 +1,6 @@
 {
-    "name": "arcadia",
-    "short_name": "arcadia",
+    "name": "Arcadia",
+    "short_name": "Arcadia",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

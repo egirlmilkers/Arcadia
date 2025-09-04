@@ -83,51 +83,56 @@ class _SettingsPageState extends State<SettingsPage> {
       context: context,
       builder: (BuildContext dialogContext) {
         // Use StatefulBuilder to manage the temporary selection state within the dialog
-        return StatefulBuilder(builder: (context, setState) {
-          T? currentSelection = selection;
-          return AlertDialog(
-            title: Row(
-              children: [
-                if (icon != null) Icon(icon),
-                const SizedBox(width: 12),
-                Text(title),
-              ],
-            ),
-            content: SizedBox(
-              width: double.minPositive,
-              // The new RadioGroup widget handles the state for its children
-              child: RadioGroup<T>(
-                groupValue: currentSelection,
-                onChanged: (T? value) {
-                   // When an option is tapped, this callback is fired.
-                   // We immediately apply the change and close the dialog.
-                  if (value != null) {
-                    onSelected(value);
-                    Navigator.of(dialogContext).pop();
-                  }
-                },
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: options.length,
-                  itemBuilder: (context, index) {
-                    final option = options[index];
-                    // RadioListTile no longer needs groupValue or onChanged
-                    return RadioListTile<T>(
-                      title: Text(optionLabelBuilder(option)),
-                      value: option,
-                    );
+        return StatefulBuilder(
+          builder: (context, setState) {
+            T? currentSelection = selection;
+            return AlertDialog(
+              title: Column(
+                children: [
+                  if (icon != null) Icon(icon, size: 24),
+                  SizedBox(height: 4),
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: double.minPositive,
+                // The new RadioGroup widget handles the state for its children
+                child: RadioGroup<T>(
+                  groupValue: currentSelection,
+                  onChanged: (T? value) {
+                    // When an option is tapped, this callback is fired.
+                    // We immediately apply the change and close the dialog.
+                    if (value != null) {
+                      onSelected(value);
+                      Navigator.of(dialogContext).pop();
+                    }
                   },
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: options.length,
+                    itemBuilder: (context, index) {
+                      final option = options[index];
+                      // RadioListTile no longer needs groupValue or onChanged
+                      return RadioListTile<T>(
+                        title: Text(optionLabelBuilder(option)),
+                        value: option,
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
-            actions: <Widget>[
-              TextButton(
-                child: const Text('Cancel'),
-                onPressed: () => Navigator.of(dialogContext).pop(),
-              ),
-            ],
-          );
-        });
+              actions: <Widget>[
+                TextButton(
+                  child: const Text('Cancel'),
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                ),
+              ],
+            );
+          },
+        );
       },
     );
   }
@@ -141,7 +146,9 @@ class _SettingsPageState extends State<SettingsPage> {
         return Scaffold(
           appBar: AppBar(
             title: const Text('Settings'),
-            backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerLowest,
           ),
           body: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 8),
