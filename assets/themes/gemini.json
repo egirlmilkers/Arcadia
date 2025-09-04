@@ -1,5 +1,11 @@
 {
     "name": "Gemini",
+    "gradientColors": [
+        "#4285F4",
+        "#9B72CB",
+        "#D96570",
+        "#F2A600"
+    ],
     "schemes": {
         "light": {
             "primary": "#4285F4",

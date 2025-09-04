@@ -1,7 +1,18 @@
 import 'package:flutter/material.dart';
 
+// Utility to convert a hex string to a Color object
+Color _colorFromHex(String hex) {
+  // Handles both #RRGGBB and #AARRGGBB formats
+  final buffer = StringBuffer();
+  if (hex.length == 6 || hex.length == 7) buffer.write('ff');
+  buffer.write(hex.replaceFirst('#', ''));
+  return Color(int.parse(buffer.toString(), radix: 16));
+}
+
+
 class AppTheme {
   final String name;
+  final List<Color> gradientColors;
   final ColorScheme light;
   final ColorScheme lightMediumContrast;
   final ColorScheme lightHighContrast;
@@ -11,6 +22,7 @@ class AppTheme {
 
   AppTheme({
     required this.name,
+    required this.gradientColors,
     required this.light,
     required this.lightMediumContrast,
     required this.lightHighContrast,
@@ -19,100 +31,96 @@ class AppTheme {
     required this.darkHighContrast,
   });
 
-  // create app theme from the json
+  // Create an AppTheme from JSON
   factory AppTheme.fromJson(Map<String, dynamic> json) {
-    // util for getting a specific scheme
-    ColorScheme colorSchemeFromJson(
-      Map<String, dynamic> schemeJson,
-      bool light,
-    ) {
-      // util for turning the hex to something flutter can use
-      Color colorFromHex(String hex) =>
-          Color(int.parse(hex.substring(1), radix: 16) + 0xFF000000);
-
+    // Helper for parsing a ColorScheme from JSON
+    ColorScheme colorSchemeFromJson(Map<String, dynamic> schemeJson, bool light) {
       return ColorScheme(
         brightness: light ? Brightness.light : Brightness.dark,
-        primary: colorFromHex(schemeJson['primary']),
-        surfaceTint: colorFromHex(schemeJson['surfaceTint']),
-        onPrimary: colorFromHex(schemeJson['onPrimary']),
-        primaryContainer: colorFromHex(schemeJson['primaryContainer']),
-        onPrimaryContainer: colorFromHex(schemeJson['onPrimaryContainer']),
-        secondary: colorFromHex(schemeJson['secondary']),
-        onSecondary: colorFromHex(schemeJson['onSecondary']),
-        secondaryContainer: colorFromHex(schemeJson['secondaryContainer']),
-        onSecondaryContainer: colorFromHex(schemeJson['onSecondaryContainer']),
-        tertiary: colorFromHex(schemeJson['tertiary']),
-        onTertiary: colorFromHex(schemeJson['onTertiary']),
-        tertiaryContainer: colorFromHex(schemeJson['tertiaryContainer']),
-        onTertiaryContainer: colorFromHex(schemeJson['onTertiaryContainer']),
-        error: colorFromHex(schemeJson['error']),
-        onError: colorFromHex(schemeJson['onError']),
-        errorContainer: colorFromHex(schemeJson['errorContainer']),
-        onErrorContainer: colorFromHex(schemeJson['onErrorContainer']),
-        surface: colorFromHex(schemeJson['surface']),
-        onSurface: colorFromHex(schemeJson['onSurface']),
-        onSurfaceVariant: colorFromHex(schemeJson['onSurfaceVariant']),
-        outline: colorFromHex(schemeJson['outline']),
-        outlineVariant: colorFromHex(schemeJson['outlineVariant']),
-        shadow: colorFromHex(schemeJson['shadow']),
-        scrim: colorFromHex(schemeJson['scrim']),
-        inverseSurface: colorFromHex(schemeJson['inverseSurface']),
-        inversePrimary: colorFromHex(schemeJson['inversePrimary']),
-        primaryFixed: colorFromHex(schemeJson['primaryFixed']),
-        onPrimaryFixed: colorFromHex(schemeJson['onPrimaryFixed']),
-        primaryFixedDim: colorFromHex(schemeJson['primaryFixedDim']),
-        onPrimaryFixedVariant: colorFromHex(
-          schemeJson['onPrimaryFixedVariant'],
-        ),
-        secondaryFixed: colorFromHex(schemeJson['secondaryFixed']),
-        onSecondaryFixed: colorFromHex(schemeJson['onSecondaryFixed']),
-        secondaryFixedDim: colorFromHex(schemeJson['secondaryFixedDim']),
-        onSecondaryFixedVariant: colorFromHex(
-          schemeJson['onSecondaryFixedVariant'],
-        ),
-        tertiaryFixed: colorFromHex(schemeJson['tertiaryFixed']),
-        onTertiaryFixed: colorFromHex(schemeJson['onTertiaryFixed']),
-        tertiaryFixedDim: colorFromHex(schemeJson['tertiaryFixedDim']),
-        onTertiaryFixedVariant: colorFromHex(
-          schemeJson['onTertiaryFixedVariant'],
-        ),
-        surfaceDim: colorFromHex(schemeJson['surfaceDim']),
-        surfaceBright: colorFromHex(schemeJson['surfaceBright']),
-        surfaceContainerLowest: colorFromHex(
-          schemeJson['surfaceContainerLowest'],
-        ),
-        surfaceContainerLow: colorFromHex(schemeJson['surfaceContainerLow']),
-        surfaceContainer: colorFromHex(schemeJson['surfaceContainer']),
-        surfaceContainerHigh: colorFromHex(schemeJson['surfaceContainerHigh']),
-        surfaceContainerHighest: colorFromHex(
-          schemeJson['surfaceContainerHighest'],
-        ),
+        primary: _colorFromHex(schemeJson['primary']),
+        surfaceTint: _colorFromHex(schemeJson['surfaceTint']),
+        onPrimary: _colorFromHex(schemeJson['onPrimary']),
+        primaryContainer: _colorFromHex(schemeJson['primaryContainer']),
+        onPrimaryContainer: _colorFromHex(schemeJson['onPrimaryContainer']),
+        secondary: _colorFromHex(schemeJson['secondary']),
+        onSecondary: _colorFromHex(schemeJson['onSecondary']),
+        secondaryContainer: _colorFromHex(schemeJson['secondaryContainer']),
+        onSecondaryContainer: _colorFromHex(schemeJson['onSecondaryContainer']),
+        tertiary: _colorFromHex(schemeJson['tertiary']),
+        onTertiary: _colorFromHex(schemeJson['onTertiary']),
+        tertiaryContainer: _colorFromHex(schemeJson['tertiaryContainer']),
+        onTertiaryContainer: _colorFromHex(schemeJson['onTertiaryContainer']),
+        error: _colorFromHex(schemeJson['error']),
+        onError: _colorFromHex(schemeJson['onError']),
+        errorContainer: _colorFromHex(schemeJson['errorContainer']),
+        onErrorContainer: _colorFromHex(schemeJson['onErrorContainer']),
+        surface: _colorFromHex(schemeJson['surface']),
+        onSurface: _colorFromHex(schemeJson['onSurface']),
+        onSurfaceVariant: _colorFromHex(schemeJson['onSurfaceVariant']),
+        outline: _colorFromHex(schemeJson['outline']),
+        outlineVariant: _colorFromHex(schemeJson['outlineVariant']),
+        shadow: _colorFromHex(schemeJson['shadow']),
+        scrim: _colorFromHex(schemeJson['scrim']),
+        inverseSurface: _colorFromHex(schemeJson['inverseSurface']),
+        inversePrimary: _colorFromHex(schemeJson['inversePrimary']),
+        primaryFixed: _colorFromHex(schemeJson['primaryFixed']),
+        onPrimaryFixed: _colorFromHex(schemeJson['onPrimaryFixed']),
+        primaryFixedDim: _colorFromHex(schemeJson['primaryFixedDim']),
+        onPrimaryFixedVariant: _colorFromHex(schemeJson['onPrimaryFixedVariant']),
+        secondaryFixed: _colorFromHex(schemeJson['secondaryFixed']),
+        onSecondaryFixed: _colorFromHex(schemeJson['onSecondaryFixed']),
+        secondaryFixedDim: _colorFromHex(schemeJson['secondaryFixedDim']),
+        onSecondaryFixedVariant: _colorFromHex(schemeJson['onSecondaryFixedVariant']),
+        tertiaryFixed: _colorFromHex(schemeJson['tertiaryFixed']),
+        onTertiaryFixed: _colorFromHex(schemeJson['onTertiaryFixed']),
+        tertiaryFixedDim: _colorFromHex(schemeJson['tertiaryFixedDim']),
+        onTertiaryFixedVariant: _colorFromHex(schemeJson['onTertiaryFixedVariant']),
+        surfaceDim: _colorFromHex(schemeJson['surfaceDim']),
+        surfaceBright: _colorFromHex(schemeJson['surfaceBright']),
+        surfaceContainerLowest: _colorFromHex(schemeJson['surfaceContainerLowest']),
+        surfaceContainerLow: _colorFromHex(schemeJson['surfaceContainerLow']),
+        surfaceContainer: _colorFromHex(schemeJson['surfaceContainer']),
+        surfaceContainerHigh: _colorFromHex(schemeJson['surfaceContainerHigh']),
+        surfaceContainerHighest: _colorFromHex(schemeJson['surfaceContainerHighest'])
       );
     }
 
     final schemes = json['schemes'] as Map<String, dynamic>;
+    
+    // Parse gradient colors, with a fallback
+    final List<Color> gradient = (json['gradientColors'] as List<dynamic>?)
+        ?.map((hex) => _colorFromHex(hex as String))
+        .toList() ?? [ const Color(0xFF4285F4), const Color(0xFF9B72CB) ];
+
+    // --- FIX: Robustly handle potentially empty or missing contrast schemes ---
+    // 1. Define base schemes
+    final lightBase = schemes['light'] as Map<String, dynamic>;
+    final darkBase = schemes['dark'] as Map<String, dynamic>;
+
+    // 2. Create merged schemes that start with the base and add any contrast-specific overrides
+    final lightMediumContrast = Map<String, dynamic>.from(lightBase)
+      ..addAll(schemes['light-medium-contrast'] as Map<String, dynamic>? ?? {});
+    
+    final lightHighContrast = Map<String, dynamic>.from(lightBase)
+      ..addAll(schemes['light-high-contrast'] as Map<String, dynamic>? ?? {});
+
+    final darkMediumContrast = Map<String, dynamic>.from(darkBase)
+      ..addAll(schemes['dark-medium-contrast'] as Map<String, dynamic>? ?? {});
+
+    final darkHighContrast = Map<String, dynamic>.from(darkBase)
+      ..addAll(schemes['dark-high-contrast'] as Map<String, dynamic>? ?? {});
+
     return AppTheme(
       name: json['name'] ?? 'Unnamed Theme',
+      gradientColors: gradient,
       // light
-      light: colorSchemeFromJson(schemes['light'], true),
-      lightMediumContrast: colorSchemeFromJson(
-        schemes['light-medium-contrast'],
-        true,
-      ),
-      lightHighContrast: colorSchemeFromJson(
-        schemes['light-high-contrast'],
-        true,
-      ),
+      light: colorSchemeFromJson(lightBase, true),
+      lightMediumContrast: colorSchemeFromJson(lightMediumContrast, true),
+      lightHighContrast: colorSchemeFromJson(lightHighContrast, true),
       // dark
-      dark: colorSchemeFromJson(schemes['dark'], false),
-      darkMediumContrast: colorSchemeFromJson(
-        schemes['dark-medium-contrast'],
-        false,
-      ),
-      darkHighContrast: colorSchemeFromJson(
-        schemes['dark-high-contrast'],
-        false,
-      ),
+      dark: colorSchemeFromJson(darkBase, false),
+      darkMediumContrast: colorSchemeFromJson(darkMediumContrast, false),
+      darkHighContrast: colorSchemeFromJson(darkHighContrast, false),
     );
   }
 }

@@ -69,7 +69,7 @@ class _SettingsPageState extends State<SettingsPage> {
     return 'Unsupported Platform';
   }
 
-  // dialog we can reuse
+  // FIX: Updated dialog to use the new RadioGroup widget
   void _showOptionSelectDialog<T>({
     required BuildContext context,
     required String title,
@@ -82,42 +82,52 @@ class _SettingsPageState extends State<SettingsPage> {
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: Row(
-            children: [
-              if (icon != null) Icon(icon),
-              const SizedBox(width: 8),
-              Text(title),
-            ],
-          ),
-          content: SizedBox(
-            width: double.minPositive,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: options.length,
-              itemBuilder: (context, index) {
-                final option = options[index];
-                return RadioListTile<T>(
-                  title: Text(optionLabelBuilder(option)),
-                  value: option,
-                  groupValue: selection,
-                  onChanged: (value) {
-                    if (value != null) {
-                      onSelected(value);
-                      Navigator.of(dialogContext).pop();
-                    }
+        // Use StatefulBuilder to manage the temporary selection state within the dialog
+        return StatefulBuilder(builder: (context, setState) {
+          T? currentSelection = selection;
+          return AlertDialog(
+            title: Row(
+              children: [
+                if (icon != null) Icon(icon),
+                const SizedBox(width: 12),
+                Text(title),
+              ],
+            ),
+            content: SizedBox(
+              width: double.minPositive,
+              // The new RadioGroup widget handles the state for its children
+              child: RadioGroup<T>(
+                groupValue: currentSelection,
+                onChanged: (T? value) {
+                   // When an option is tapped, this callback is fired.
+                   // We immediately apply the change and close the dialog.
+                  if (value != null) {
+                    onSelected(value);
+                    Navigator.of(dialogContext).pop();
+                  }
+                },
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: options.length,
+                  itemBuilder: (context, index) {
+                    final option = options[index];
+                    // RadioListTile no longer needs groupValue or onChanged
+                    return RadioListTile<T>(
+                      title: Text(optionLabelBuilder(option)),
+                      value: option,
+                    );
                   },
-                );
-              },
+                ),
+              ),
             ),
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () => Navigator.of(dialogContext).pop(),
-            ),
-          ],
-        );
+            actions: <Widget>[
+              TextButton(
+                child: const Text('Cancel'),
+                onPressed: () => Navigator.of(dialogContext).pop(),
+              ),
+            ],
+          );
+        });
       },
     );
   }
@@ -131,9 +141,7 @@ class _SettingsPageState extends State<SettingsPage> {
         return Scaffold(
           appBar: AppBar(
             title: const Text('Settings'),
-            backgroundColor: Theme.of(
-              context,
-            ).colorScheme.surfaceContainerLowest,
+            backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
           ),
           body: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 8),

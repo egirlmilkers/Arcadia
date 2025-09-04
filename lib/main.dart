@@ -5,11 +5,7 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'theme/manager.dart';
 import 'ui/settings.dart';
 
-// --- THEME MANAGEMENT ---
-// Your new theme manager will be provided to the app.
-
 void main() {
-  // Ensure that plugin services are initialized so that `shared_preferences` can be used.
   WidgetsFlutterBinding.ensureInitialized();
   runApp(
     ChangeNotifierProvider(
@@ -19,7 +15,7 @@ void main() {
   );
 }
 
-// A simple data class for a chat message.
+// Data class for a chat message.
 class ChatMessage {
   final String text;
   final bool isUser;
@@ -33,20 +29,12 @@ class GeminiApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<ThemeManager>(
       builder: (context, themeManager, child) {
-        // Use a DynamicColorBuilder to get system accent colors
         return DynamicColorBuilder(
           builder: (lightDynamic, darkDynamic) {
             return MaterialApp(
-              title: 'Arcadia',
-              // Get themes from your manager
-              theme: themeManager.getTheme(
-                Brightness.light,
-                scheme: lightDynamic,
-              ),
-              darkTheme: themeManager.getTheme(
-                Brightness.dark,
-                scheme: darkDynamic,
-              ),
+              title: 'Arcadia', // App name updated
+              theme: themeManager.getTheme(Brightness.light, scheme: lightDynamic),
+              darkTheme: themeManager.getTheme(Brightness.dark, scheme: darkDynamic),
               themeMode: themeManager.themeMode,
               home: const MainScreen(),
               debugShowCheckedModeBanner: false,
@@ -67,14 +55,15 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  // We'll use a nullable ChatMessage list to represent the active chat.
-  // If it's null, we show the WelcomeView. If it's a list, we show the ChatScreen.
   List<ChatMessage>? _activeChat;
 
   void _startNewChat() {
     setState(() {
       _activeChat = [
-        ChatMessage(text: "Hi there! How can I help you today?", isUser: false),
+        ChatMessage(
+          text: "Hi there! How can I help you today?",
+          isUser: false,
+        ),
       ];
     });
   }
@@ -84,9 +73,7 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       body: Row(
         children: [
-          // The persistent sidebar
           SideMenu(onNewChat: _startNewChat),
-          // The main content area
           Expanded(
             child: _activeChat == null
                 ? const WelcomeView()
@@ -98,6 +85,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
+
 // --- WIDGETS ---
 
 class SideMenu extends StatelessWidget {
@@ -107,6 +95,8 @@ class SideMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final themeManager = context.watch<ThemeManager>();
+
     return Container(
       width: 280,
       color: theme.colorScheme.surfaceContainerLowest,
@@ -114,17 +104,14 @@ class SideMenu extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // App Title/Logo
           Padding(
             padding: const EdgeInsets.only(bottom: 24.0, top: 8.0),
             child: Text(
-              "Gemini",
-              style: theme.textTheme.headlineSmall?.copyWith(
-                color: theme.colorScheme.onSurface,
-              ),
+              themeManager.selectedTheme,
+              style: theme.textTheme.headlineSmall
+                  ?.copyWith(color: theme.colorScheme.onSurface),
             ),
           ),
-          // New Chat Button
           ElevatedButton.icon(
             onPressed: onNewChat,
             icon: const Icon(Icons.add),
@@ -139,12 +126,10 @@ class SideMenu extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          // Chat History Section
           Text("Recent", style: theme.textTheme.titleSmall),
           Expanded(
             child: ListView(
               children: [
-                // Mock chat history items
                 ListTile(
                   leading: const Icon(Icons.chat_bubble_outline),
                   title: const Text("Recipe for a great weekend..."),
@@ -158,16 +143,14 @@ class SideMenu extends StatelessWidget {
               ],
             ),
           ),
-          // Settings and Theme Toggle
           const Divider(),
           ListTile(
             leading: const Icon(Icons.settings_outlined),
             title: const Text("Settings"),
             onTap: () {
-              // Navigate to the new settings page
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const SettingsPage()),
-              );
+              Navigator.of(context).push(MaterialPageRoute(
+                builder: (context) => const SettingsPage(),
+              ));
             },
           ),
         ],
@@ -176,12 +159,16 @@ class SideMenu extends StatelessWidget {
   }
 }
 
+
 class WelcomeView extends StatelessWidget {
   const WelcomeView({super.key});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final themeManager = context.watch<ThemeManager>();
+    final gradientColors = themeManager.currentTheme?.gradientColors ?? [theme.colorScheme.primary, theme.colorScheme.tertiary];
+
     return Center(
       child: Container(
         constraints: const BoxConstraints(maxWidth: 700),
@@ -190,15 +177,9 @@ class WelcomeView extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Gradient Text
             ShaderMask(
-              shaderCallback: (bounds) => const LinearGradient(
-                colors: [
-                  Color(0xFF4285F4),
-                  Color(0xFF9B72CB),
-                  Color(0xFFD96570),
-                  Color(0xFFF2A600),
-                ],
+              shaderCallback: (bounds) => LinearGradient(
+                colors: gradientColors,
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ).createShader(bounds),
@@ -207,47 +188,27 @@ class WelcomeView extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 56,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white, // This color is necessary for ShaderMask
+                  color: Colors.white,
                 ),
               ),
             ),
             Text(
               "How can I help you today?",
-              style: theme.textTheme.headlineLarge?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+              style: theme.textTheme.headlineLarge
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 40),
-            // Suggestion Cards
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
-                  child: SuggestionCard(icon: Icons.code, text: "Help me code"),
-                ),
+                Expanded(child: SuggestionCard(icon: Icons.code, text: "Help me code")),
                 const SizedBox(width: 16),
-                Expanded(
-                  child: SuggestionCard(
-                    icon: Icons.edit,
-                    text: "Help me write",
-                  ),
-                ),
+                Expanded(child: SuggestionCard(icon: Icons.edit, text: "Help me write")),
                 const SizedBox(width: 16),
-                Expanded(
-                  child: SuggestionCard(
-                    icon: Icons.lightbulb_outline,
-                    text: "Give me ideas",
-                  ),
-                ),
+                Expanded(child: SuggestionCard(icon: Icons.lightbulb_outline, text: "Give me ideas")),
                 const SizedBox(width: 16),
-                Expanded(
-                  child: SuggestionCard(
-                    icon: Icons.flight_takeoff,
-                    text: "Help me plan",
-                  ),
-                ),
+                Expanded(child: SuggestionCard(icon: Icons.flight_takeoff, text: "Help me plan")),
               ],
-            ),
+            )
           ],
         ),
       ),
@@ -305,11 +266,9 @@ class _ChatScreenState extends State<ChatScreen> {
       _textController.clear();
       _scrollToBottom();
 
-      // --- TODO: API call goes here ---
       await Future.delayed(const Duration(seconds: 2));
-      const modelResponse =
-          "This is a simulated response. You can now implement the real API call to your Vertex AI model.";
-
+      const modelResponse = "This is a simulated response. You can now implement the real API call to your Vertex AI model.";
+      
       setState(() {
         widget.messages.add(ChatMessage(text: modelResponse, isUser: false));
         _isLoading = false;
@@ -440,7 +399,7 @@ class MessageBubble extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Gemini',
+                    'Arcadia',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: theme.colorScheme.onSurface,
