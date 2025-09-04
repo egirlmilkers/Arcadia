@@ -1,0 +1,110 @@
+# Miscellaneous
+*.class
+*.pyc
+*.swp
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Flutter/Dart/Pub related
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.melos_tool/
+
+# IDEs and editors
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS-related
+.DS_Store
+Thumbs.db
+
+# Other metadata
+.metadata
+
+# Tests and coverage
+coverage/
+
+# Generated files
+*.lock
+*.log
+
+# Android
+android/.gradle/
+android/captures/
+android/.idea/
+android/local.properties
+android/*.iml
+
+# iOS
+ios/.generated/
+ios/Flutter/.last_build_id
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Runner.xcworkspace/
+ios/Pods/
+ios/.symlinks/
+ios/Podfile.lock
+
+# macOS
+macos/Flutter/ephemeral/
+macos/Flutter/GeneratedPluginRegistrant.swift
+macos/Runner.xcworkspace/
+macos/Pods/
+macos/.symlinks/
+macos/Podfile.lock
+
+# Web
+web/.dart_tool/
+
+# Linux
+linux/flutter/ephemeral/
+linux/CMakeFiles/
+linux/Makefile
+linux/cmake-build-*/
+
+# Windows
+windows/flutter/ephemeral/
+windows/CMakeFiles/
+windows/Makefile
+windows/cmake-build-*/
+
+# Symbolic links or intermediate files
+*.tmp
+*.temp
+
+# Coverage
+coverage/
