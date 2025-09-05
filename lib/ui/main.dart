@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import '../main.dart';
 import '../services/chat_history.dart';
+import '../services/model.dart';
 import '../theme/manager.dart';
 import 'chat.dart';
 import 'nav.dart';
@@ -24,7 +25,6 @@ class _MainUIState extends State<MainUI> {
   final ChatHistoryService _chatHistoryService = ChatHistoryService();
   bool _isPinned = true;
   bool _isHovering = false;
-  String _selectedModel = 'gemini-2.5-flash';
 
   @override
   void initState() {
@@ -42,12 +42,7 @@ class _MainUIState extends State<MainUI> {
       final newChat = ChatSession(
         id: Uuid().v4(),
         title: 'New Chat',
-        messages: [
-          ChatMessage(
-            text: "Hi there! How can I help you today?",
-            isUser: false,
-          ),
-        ],
+        messages: [],
       );
       _chatHistory.insert(0, newChat);
       _activeChat = newChat;
@@ -85,6 +80,7 @@ class _MainUIState extends State<MainUI> {
   @override
   Widget build(BuildContext context) {
     final themeManager = context.watch<ThemeManager>();
+    final modelManager = context.watch<ModelManager>();
     final theme = Theme.of(context);
     final gradientColors =
         themeManager.currentTheme?.gradientColors ??
@@ -99,6 +95,9 @@ class _MainUIState extends State<MainUI> {
             padding: EdgeInsets.only(left: _isPinned ? 280 : 74),
             child: Scaffold(
               appBar: AppBar(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                scrolledUnderElevation: 0,
                 title: GestureDetector(
                   onTap: _resetToHome,
                   child: ShaderMask(
@@ -118,22 +117,45 @@ class _MainUIState extends State<MainUI> {
                   ),
                 ),
                 actions: [
-                  DropdownButton<String>(
-                    value: _selectedModel,
-                    onChanged: (String? newValue) {
-                      setState(() {
-                        _selectedModel = newValue!;
-                      });
-                    },
-                    items: <String>['gemini-2.5-pro', 'gemini-2.5-flash']
-                        .map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value.replaceFirst('gemini-', '')),
+                  if (!modelManager.loading)
+                    PopupMenuButton<String>(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      onSelected: (String modelName) {
+                        modelManager.setSelectedModel(modelName);
+                      },
+                      itemBuilder: (BuildContext context) {
+                        return modelManager.models.map((Model model) {
+                          return PopupMenuItem<String>(
+                            value: model.modelName,
+                            child: ListTile(
+                              title: Text(model.displayName),
+                              subtitle: Text(model.subtitle),
+                            ),
                           );
-                        })
-                        .toList(),
-                  ),
+                        }).toList();
+                      },
+                      child: Card(
+                        color: theme.colorScheme.surfaceContainer,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          child: Row(
+                            children: [
+                              Text(modelManager.selectedModel.displayName),
+                              const Icon(Icons.arrow_drop_down),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(width: 16),
                 ],
               ),
               body: Column(
@@ -144,7 +166,7 @@ class _MainUIState extends State<MainUI> {
                         ? const WelcomeUI()
                         : ChatUI(
                             chatSession: _activeChat!,
-                            selectedModel: _selectedModel,
+                            selectedModel: modelManager.selectedModel.modelName,
                           ),
                   ),
                 ],

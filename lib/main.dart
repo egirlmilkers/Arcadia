@@ -4,14 +4,18 @@ import 'package:provider/provider.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:uuid/uuid.dart';
 
+import 'services/model.dart';
 import 'theme/manager.dart';
 import 'ui/main.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeManager(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeManager()),
+        ChangeNotifierProvider(create: (_) => ModelManager()),
+      ],
       child: const Arcadia(),
     ),
   );
@@ -19,15 +23,18 @@ void main() {
 
 // TODO:
 // - Attachment display
-// - Hook up to API
-// - Model select
-// - Save chats and chat menu
 // - thinking dropdown
 // - Stop model
 // - WIN + V doesn't work
 // - new chat only if a message is sent
-// - remove fake first message
 // - make markdown work
+// - chat list not filling all space
+// - chat management
+// - remember pin state
+// - about should show build number as well
+// - loading spinner
+// - move collapse button
+// - model highlight should only highlight button
 
 // --- DATA MODELS ---
 

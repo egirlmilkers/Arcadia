@@ -107,7 +107,7 @@ class _ChatUIState extends State<ChatUI> {
         Expanded(
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 800),
+              constraints: const BoxConstraints(maxWidth: 900),
               child: ListView.builder(
                 controller: _scrollController,
                 padding: const EdgeInsets.all(16.0),
@@ -233,7 +233,7 @@ class _ChatUIState extends State<ChatUI> {
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 800),
+        constraints: const BoxConstraints(maxWidth: 900),
         child: inputArea,
       ),
     );
@@ -297,8 +297,8 @@ class _MessageBubbleState extends State<MessageBubble> {
               ),
             ),
             constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.75,
-              minWidth: 300,
+              maxWidth: isUser ? 500 : MediaQuery.of(context).size.width * 0.75,
+              minWidth: 100,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

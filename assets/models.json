@@ -1,0 +1,12 @@
+[
+	{
+		"displayName": "2.5 Flash",
+		"subtitle": "Fast all-around help",
+		"modelName": "gemini-2.5-flash"
+	},
+	{
+		"displayName": "2.5 Pro",
+		"subtitle": "Reasoning, math & code",
+		"modelName": "gemini-2.5-pro"
+	}
+]
