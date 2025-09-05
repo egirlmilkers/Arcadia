@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:toastification/toastification.dart';
+import 'package:provider/provider.dart';
 
 import '../main.dart';
+import '../theme/manager.dart';
 
 class ChatUI extends StatefulWidget {
   final List<ChatMessage> messages;
@@ -66,9 +70,7 @@ class _ChatUIState extends State<ChatUI> {
                 itemCount: widget.messages.length,
                 itemBuilder: (context, index) {
                   final message = widget.messages[index];
-                  return MessageBubble(
-                    message: message,
-                  ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.5);
+                  return MessageBubble(message: message);
                 },
               ),
             ),
@@ -86,32 +88,71 @@ class _ChatUIState extends State<ChatUI> {
 
   Widget _buildTextInputArea() {
     final theme = Theme.of(context);
-    return Container(
+    final themeManager = Provider.of<ThemeManager>(context, listen: false);
+    final themeName = themeManager.selectedTheme;
+
+    final inputArea = Container(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       color: theme.scaffoldBackgroundColor,
       child: SafeArea(
         child: Row(
           children: [
-            IconButton(
-              icon: const Icon(Icons.attach_file_outlined),
-              onPressed: () {
-                // TODO: Implement file picking
-              },
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            Expanded(
-              child: RawKeyboardListener(
-                focusNode: FocusNode(),
-                onKey: (event) {
-                  if (event.isKeyPressed(LogicalKeyboardKey.enter) &&
-                      !HardwareKeyboard.instance.isShiftPressed) {
-                    _sendMessage();
+            Tooltip(
+              message: 'Attach files',
+              child: IconButton(
+                icon: const Icon(Icons.attach_file_outlined),
+                onPressed: () async {
+                  final result = await FilePicker.platform.pickFiles(
+                    type: FileType.custom,
+                    allowedExtensions: [
+                      // Images
+                      'jpg', 'jpeg', 'png', 'webp',
+                      // Videos
+                      'mp4', 'webm', 'mkv', 'mov',
+                      // Documents
+                      'pdf', 'txt',
+                      // Audio
+                      'mp3',
+                      'mpga',
+                      'wav',
+                      'webm',
+                      'm4a',
+                      'opus',
+                      'aac',
+                      'flac',
+                      'pcm',
+                    ],
+                  );
+                  if (result != null) {
+                    // TODO: Handle picked files
                   }
+                },
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+
+            const SizedBox(width: 8),
+
+            Expanded(
+              child: Focus(
+                onKeyEvent: (FocusNode node, KeyEvent event) {
+                  if (HardwareKeyboard.instance.isLogicalKeyPressed(
+                        LogicalKeyboardKey.enter,
+                      ) &&
+                      !HardwareKeyboard.instance.isShiftPressed) {
+                    if (event is KeyDownEvent) {
+                      _sendMessage();
+                    }
+                    // The event is handled, so stop it from propagating.
+                    return KeyEventResult.handled;
+                  }
+                  // Otherwise, let the event propagate.
+                  return KeyEventResult.ignored;
                 },
                 child: TextField(
                   controller: _textController,
                   decoration: InputDecoration(
-                    hintText: 'Message...',
+                    hintText: 'Ask $themeName',
                     filled: true,
                     fillColor: theme.colorScheme.surfaceContainer,
                     border: OutlineInputBorder(
@@ -129,17 +170,27 @@ class _ChatUIState extends State<ChatUI> {
               ),
             ),
             const SizedBox(width: 8.0),
-            IconButton(
-              icon: const Icon(Icons.send),
-              onPressed: _isLoading ? null : _sendMessage,
-              style: IconButton.styleFrom(
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: theme.colorScheme.onPrimary,
-                padding: const EdgeInsets.all(12.0),
+            Tooltip(
+              message: 'Send message',
+              child: IconButton(
+                icon: const Icon(Icons.send),
+                onPressed: _isLoading ? null : _sendMessage,
+                style: IconButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                  padding: const EdgeInsets.all(12.0),
+                ),
               ),
             ),
           ],
         ),
+      ),
+    );
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 800),
+        child: inputArea,
       ),
     );
   }
@@ -154,17 +205,16 @@ class MessageBubble extends StatefulWidget {
 }
 
 class _MessageBubbleState extends State<MessageBubble> {
-  bool _isExpanded = true;
   late final bool _isLongMessage;
+  late bool _isExpanded;
   static const int _maxLength = 300;
+  bool _hasAnimated = false;
 
   @override
   void initState() {
     super.initState();
     _isLongMessage = widget.message.text.length > _maxLength;
-    if (_isLongMessage && widget.message.isUser) {
-      _isExpanded = false;
-    }
+    _isExpanded = !(_isLongMessage && widget.message.isUser);
   }
 
   @override
@@ -172,12 +222,11 @@ class _MessageBubbleState extends State<MessageBubble> {
     final theme = Theme.of(context);
     final isUser = widget.message.isUser;
 
-    final messageText =
-        _isExpanded || !isUser || !_isLongMessage
-            ? widget.message.text
-            : '${widget.message.text.substring(0, _maxLength)}...';
+    final messageText = _isExpanded || !isUser || !_isLongMessage
+        ? widget.message.text
+        : '${widget.message.text.substring(0, _maxLength)}...';
 
-    return Align(
+    Widget messageWidget = Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Stack(
         children: [
@@ -188,13 +237,15 @@ class _MessageBubbleState extends State<MessageBubble> {
               left: isUser ? 10.0 : 0.0,
               right: isUser ? 0.0 : 10.0,
             ),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 12.0,
+            ),
             decoration: BoxDecoration(
               color: isUser
                   ? theme.colorScheme.primaryContainer
                   : Colors.transparent,
-              borderRadius: BorderRadius.only(
+              borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(24),
                 topRight: Radius.circular(5),
                 bottomLeft: Radius.circular(24),
@@ -203,27 +254,31 @@ class _MessageBubbleState extends State<MessageBubble> {
             ),
             constraints: BoxConstraints(
               maxWidth: MediaQuery.of(context).size.width * 0.75,
+              minWidth: 300,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (_isLongMessage && isUser)
-                  _buildIconButton(
-                    context,
-                    _isExpanded ? Icons.expand_less : Icons.expand_more,
-                    () {
-                      setState(() {
-                        _isExpanded = !_isExpanded;
-                      });
-                    },
-                    color: theme.colorScheme.onPrimaryContainer,
+                  Tooltip(
+                    message: _isExpanded ? 'Collapse' : 'Expand',
+                    child: _buildIconButton(
+                      context,
+                      _isExpanded ? Icons.expand_less : Icons.expand_more,
+                      () {
+                        setState(() {
+                          _isExpanded = !_isExpanded;
+                        });
+                      },
+                      color: theme.colorScheme.onPrimaryContainer,
+                    ),
                   ),
                 if (widget.message.attachments.isNotEmpty)
                   _buildAttachmentView(context),
                 if (widget.message.text.isNotEmpty)
                   SelectableText(
                     messageText,
-                    style: theme.textTheme.bodyMedium?.copyWith(
+                    style: theme.textTheme.bodyLarge?.copyWith(
                       color: isUser
                           ? theme.colorScheme.onPrimaryContainer
                           : theme.colorScheme.onSurface,
@@ -237,6 +292,21 @@ class _MessageBubbleState extends State<MessageBubble> {
         ],
       ),
     );
+
+    if (!_hasAnimated) {
+      messageWidget = messageWidget
+          .animate(
+            onComplete: (controller) {
+              setState(() {
+                _hasAnimated = true;
+              });
+            },
+          )
+          .fadeIn(duration: 500.ms)
+          .slideY(begin: 0.5);
+    }
+
+    return messageWidget;
   }
 
   Widget _buildAttachmentView(BuildContext context) {
@@ -265,30 +335,78 @@ class _MessageBubbleState extends State<MessageBubble> {
       mainAxisSize: MainAxisSize.min,
       children: isUser
           ? [
-              _buildIconButton(
-                context,
-                Icons.copy_all_outlined,
-                () {
-                  Clipboard.setData(ClipboardData(text: widget.message.text));
-                },
-                color: theme.colorScheme.onPrimaryContainer,
+              Tooltip(
+                message: 'Copy',
+                child: _buildIconButton(
+                  context,
+                  Icons.copy_all_outlined,
+                  () {
+                    Clipboard.setData(ClipboardData(text: widget.message.text));
+                    toastification.show(
+                      context: context,
+                      type: ToastificationType.success,
+                      style: ToastificationStyle.simple,
+                      title: Text("Copied to clipboard!"),
+                      alignment: Alignment.bottomCenter,
+                      autoCloseDuration: const Duration(seconds: 1),
+                      animationBuilder: (context, animation, alignment, child) {
+                        return FadeTransition(opacity: animation, child: child);
+                      },
+                      icon: Icon(Icons.content_copy_outlined),
+                      borderRadius: BorderRadius.circular(100.0),
+                      closeButton: ToastCloseButton(
+                        showType: CloseButtonShowType.none,
+                      ),
+                      dragToClose: true,
+                      applyBlurEffect: true,
+                    );
+                  },
+                  color: theme.colorScheme.onPrimaryContainer,
+                ),
               ),
-              _buildIconButton(
-                context,
-                Icons.edit_outlined,
-                () {
-                  // TODO: Implement edit
-                },
-                color: theme.colorScheme.onPrimaryContainer,
+              Tooltip(
+                message: 'Edit',
+                child: _buildIconButton(
+                  context,
+                  Icons.edit_outlined,
+                  () {
+                    // TODO: Implement edit
+                  },
+                  color: theme.colorScheme.onPrimaryContainer,
+                ),
               ),
             ]
           : [
-              _buildIconButton(context, Icons.copy_all_outlined, () {
-                Clipboard.setData(ClipboardData(text: widget.message.text));
-              }),
-              _buildIconButton(context, Icons.refresh_outlined, () {
-                // TODO: Implement regenerate
-              }),
+              Tooltip(
+                message: 'Copy',
+                child: _buildIconButton(context, Icons.copy_all_outlined, () {
+                  Clipboard.setData(ClipboardData(text: widget.message.text));
+                  toastification.show(
+                    context: context,
+                    type: ToastificationType.success,
+                    style: ToastificationStyle.simple,
+                    title: Text("Copied to clipboard!"),
+                    alignment: Alignment.bottomCenter,
+                    autoCloseDuration: const Duration(seconds: 1),
+                    animationBuilder: (context, animation, alignment, child) {
+                      return FadeTransition(opacity: animation, child: child);
+                    },
+                    icon: Icon(Icons.content_copy_outlined),
+                    borderRadius: BorderRadius.circular(100.0),
+                    closeButton: ToastCloseButton(
+                      showType: CloseButtonShowType.none,
+                    ),
+                    dragToClose: true,
+                    applyBlurEffect: true,
+                  );
+                }),
+              ),
+              Tooltip(
+                message: 'Regenerate',
+                child: _buildIconButton(context, Icons.refresh_outlined, () {
+                  // TODO: Implement regenerate
+                }),
+              ),
             ],
     );
   }

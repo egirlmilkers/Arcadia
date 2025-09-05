@@ -150,84 +150,91 @@ class _SettingsPageState extends State<SettingsPage> {
               context,
             ).colorScheme.surfaceContainerLowest,
           ),
-          body: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            children: [
-              // Theme section
-              SettingsHeader('Appearance'),
+          body: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 800),
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                children: [
+                  // Theme section
+                  SettingsHeader('Appearance'),
 
-              SettingsListTile(
-                title: 'App theme',
-                subtitle: themeManager.themeMode.name.capitalize(),
-                onTap: () => _showOptionSelectDialog(
-                  context: context,
-                  title: 'App theme',
-                  icon: Icons.palette_outlined,
-                  options: ThemeMode.values,
-                  selection: themeManager.themeMode,
-                  optionLabelBuilder: (m) => m.name.capitalize(),
-                  onSelected: (m) => themeManager.setThemeMode(m),
-                ),
-              ),
-
-              SettingsListTile(
-                title: 'Style',
-                subtitle: themeManager.selectedTheme,
-                onTap: () => _showOptionSelectDialog(
-                  context: context,
-                  title: 'Style',
-                  icon: Icons.colorize_outlined,
-                  options: themeManager.themes.map((t) => t.name).toList(),
-                  selection: themeManager.selectedTheme,
-                  optionLabelBuilder: (name) => name,
-                  onSelected: (name) => themeManager.setSelectedTheme(name),
-                ),
-                enabled: customStyleAllowed,
-              ),
-
-              ListTile(
-                title: const Text('Contrast level'),
-                enabled: customStyleAllowed,
-                subtitle: SegmentedButton<ContrastLevel>(
-                  segments: const [
-                    ButtonSegment(
-                      value: ContrastLevel.standard,
-                      label: Text('Default'),
+                  SettingsListTile(
+                    title: 'App theme',
+                    subtitle: themeManager.themeMode.name.capitalize(),
+                    onTap: () => _showOptionSelectDialog(
+                      context: context,
+                      title: 'App theme',
+                      icon: Icons.palette_outlined,
+                      options: ThemeMode.values,
+                      selection: themeManager.themeMode,
+                      optionLabelBuilder: (m) => m.name.capitalize(),
+                      onSelected: (m) => themeManager.setThemeMode(m),
                     ),
-                    ButtonSegment(
-                      value: ContrastLevel.medium,
-                      label: Text('Medium'),
+                  ),
+
+                  SettingsListTile(
+                    title: 'Style',
+                    subtitle: themeManager.selectedTheme,
+                    onTap: () => _showOptionSelectDialog(
+                      context: context,
+                      title: 'Style',
+                      icon: Icons.colorize_outlined,
+                      options: themeManager.themes.map((t) => t.name).toList(),
+                      selection: themeManager.selectedTheme,
+                      optionLabelBuilder: (name) => name,
+                      onSelected: (name) => themeManager.setSelectedTheme(name),
                     ),
-                    ButtonSegment(
-                      value: ContrastLevel.high,
-                      label: Text('High'),
+                    enabled: customStyleAllowed,
+                  ),
+
+                  ListTile(
+                    title: const Text('Contrast level'),
+                    enabled: customStyleAllowed,
+                    subtitle: SegmentedButton<ContrastLevel>(
+                      segments: const [
+                        ButtonSegment(
+                          value: ContrastLevel.standard,
+                          label: Text('Default'),
+                        ),
+                        ButtonSegment(
+                          value: ContrastLevel.medium,
+                          label: Text('Medium'),
+                        ),
+                        ButtonSegment(
+                          value: ContrastLevel.high,
+                          label: Text('High'),
+                        ),
+                      ],
+                      selected: {themeManager.contrastLevel},
+                      onSelectionChanged: customStyleAllowed
+                          ? (selection) =>
+                                themeManager.setContrastLevel(selection.first)
+                          : null,
                     ),
-                  ],
-                  selected: {themeManager.contrastLevel},
-                  onSelectionChanged: customStyleAllowed
-                      ? (selection) =>
-                            themeManager.setContrastLevel(selection.first)
-                      : null,
-                ),
+                  ),
+
+                  SwitchListTile(
+                    title: Text(_dynamicColorLabel),
+                    subtitle: const Text(
+                      'Use colors from your system\'s theme',
+                    ),
+                    value: themeManager.useDynamicColor,
+                    onChanged: themeManager.dynamicColorAvailable
+                        ? (value) => themeManager.setDynamicColor(value)
+                        : null,
+                  ),
+
+                  const Divider(height: 24),
+
+                  SettingsHeader('About'),
+                  SettingsListTile(title: 'Version', subtitle: _version),
+                  SettingsListTile(title: 'Platform', subtitle: _platformInfo),
+
+                  const SizedBox(height: 16),
+                ],
               ),
-
-              SwitchListTile(
-                title: Text(_dynamicColorLabel),
-                subtitle: const Text('Use colors from your system\'s theme'),
-                value: themeManager.useDynamicColor,
-                onChanged: themeManager.dynamicColorAvailable
-                    ? (value) => themeManager.setDynamicColor(value)
-                    : null,
-              ),
-
-              const Divider(height: 24),
-
-              SettingsHeader('About'),
-              SettingsListTile(title: 'Version', subtitle: _version),
-              SettingsListTile(title: 'Platform', subtitle: _platformInfo),
-
-              const SizedBox(height: 16),
-            ],
+            ),
           ),
         );
       },

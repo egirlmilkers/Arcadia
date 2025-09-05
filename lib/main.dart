@@ -16,6 +16,12 @@ void main() {
   );
 }
 
+// TODO:
+// - Attachment display
+// - Hook up to API
+// - Model select
+// - Save chats and chat menu
+
 // --- DATA MODELS ---
 
 class ChatMessage {
