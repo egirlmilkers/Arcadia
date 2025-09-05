@@ -5,13 +5,21 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:toastification/toastification.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../main.dart';
+import '../services/chat_history.dart';
+import '../services/gemini.dart';
 import '../theme/manager.dart';
 
 class ChatUI extends StatefulWidget {
-  final List<ChatMessage> messages;
-  const ChatUI({super.key, required this.messages});
+  final ChatSession chatSession;
+  final String selectedModel;
+  const ChatUI({
+    super.key,
+    required this.chatSession,
+    required this.selectedModel,
+  });
 
   @override
   State<ChatUI> createState() => _ChatUIState();
@@ -20,27 +28,63 @@ class ChatUI extends StatefulWidget {
 class _ChatUIState extends State<ChatUI> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final ChatHistoryService _chatHistoryService = ChatHistoryService();
   bool _isLoading = false;
 
   void _sendMessage() async {
     final text = _textController.text.trim();
     if (text.isNotEmpty) {
       setState(() {
-        widget.messages.add(ChatMessage(text: text, isUser: true));
+        widget.chatSession.messages.add(ChatMessage(text: text, isUser: true));
         _isLoading = true;
       });
       _textController.clear();
       _scrollToBottom();
 
-      await Future.delayed(const Duration(seconds: 2));
-      const modelResponse =
-          "This is a simulated response. You can now implement the real API call to your Vertex AI model.";
+      if (widget.chatSession.isNew) {
+        widget.chatSession.generateTitleFromFirstMessage();
+        widget.chatSession.isNew = false;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final apiKey = prefs.getString('gemini_api_key');
+      if (apiKey == null) {
+        setState(() {
+          widget.chatSession.messages.add(
+            ChatMessage(
+              text: 'API key not set. Please set it in settings.',
+              isUser: false,
+            ),
+          );
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final gemini = GeminiService(apiKey: apiKey);
+      final modelResponse = await gemini.generateContent(
+        widget.chatSession.messages,
+        widget.selectedModel,
+      );
 
       setState(() {
-        widget.messages.add(ChatMessage(text: modelResponse, isUser: false));
+        widget.chatSession.messages.add(
+          ChatMessage(text: modelResponse, isUser: false),
+        );
         _isLoading = false;
       });
       _scrollToBottom();
+
+      final chats = await _chatHistoryService.loadChats();
+      final index = chats.indexWhere(
+        (chat) => chat.id == widget.chatSession.id,
+      );
+      if (index != -1) {
+        chats[index] = widget.chatSession;
+      } else {
+        chats.insert(0, widget.chatSession);
+      }
+      await _chatHistoryService.saveChats(chats);
     }
   }
 
@@ -67,9 +111,9 @@ class _ChatUIState extends State<ChatUI> {
               child: ListView.builder(
                 controller: _scrollController,
                 padding: const EdgeInsets.all(16.0),
-                itemCount: widget.messages.length,
+                itemCount: widget.chatSession.messages.length,
                 itemBuilder: (context, index) {
-                  final message = widget.messages[index];
+                  final message = widget.chatSession.messages[index];
                   return MessageBubble(message: message);
                 },
               ),

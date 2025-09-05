@@ -2,9 +2,11 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+
 import 'package:provider/provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../theme/manager.dart';
 import '../util.dart';
@@ -20,11 +22,28 @@ class _SettingsPageState extends State<SettingsPage> {
   String _version = '...';
   String _platformInfo = '...';
   String _dynamicColorLabel = 'Dynamic Color';
+  String _apiKey = '...';
 
   @override
   void initState() {
     super.initState();
     _initAppInfo();
+    _loadApiKey();
+  }
+
+  Future<void> _loadApiKey() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _apiKey = prefs.getString('gemini_api_key') ?? 'Not set';
+    });
+  }
+
+  Future<void> _saveApiKey(String apiKey) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('gemini_api_key', apiKey);
+    setState(() {
+      _apiKey = apiKey;
+    });
   }
 
   // get the version from the package info
@@ -137,6 +156,35 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  void _showApiKeyDialog() {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Set API Key'),
+          content: TextField(
+            controller: controller,
+            decoration: InputDecoration(hintText: 'Enter your Gemini API Key'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                _saveApiKey(controller.text);
+                Navigator.of(context).pop();
+              },
+              child: Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<ThemeManager>(
@@ -223,6 +271,17 @@ class _SettingsPageState extends State<SettingsPage> {
                     onChanged: themeManager.dynamicColorAvailable
                         ? (value) => themeManager.setDynamicColor(value)
                         : null,
+                  ),
+
+                  const Divider(height: 24),
+
+                  SettingsHeader('API'),
+                  SettingsListTile(
+                    title: 'Gemini API Key',
+                    subtitle: _apiKey.length > 4
+                        ? '••••••••${_apiKey.substring(_apiKey.length - 4)}'
+                        : 'Not set',
+                    onTap: _showApiKeyDialog,
                   ),
 
                   const Divider(height: 24),

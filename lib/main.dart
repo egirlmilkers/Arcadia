@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:provider/provider.dart';
 import 'package:dynamic_color/dynamic_color.dart';
+import 'package:uuid/uuid.dart';
 
 import 'theme/manager.dart';
 import 'ui/main.dart';
@@ -21,10 +22,17 @@ void main() {
 // - Hook up to API
 // - Model select
 // - Save chats and chat menu
+// - thinking dropdown
+// - Stop model
+// - WIN + V doesn't work
+// - new chat only if a message is sent
+// - remove fake first message
+// - make markdown work
 
 // --- DATA MODELS ---
 
 class ChatMessage {
+  final String id;
   final String text;
   final bool isUser;
   final List<String> attachments;
@@ -33,7 +41,26 @@ class ChatMessage {
     required this.text,
     required this.isUser,
     this.attachments = const [],
-  });
+    String? id,
+  }) : id = id ?? Uuid().v4();
+
+  factory ChatMessage.fromJson(Map<String, dynamic> json) {
+    return ChatMessage(
+      id: json['id'],
+      text: json['text'],
+      isUser: json['isUser'],
+      attachments: List<String>.from(json['attachments']),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'text': text,
+      'isUser': isUser,
+      'attachments': attachments,
+    };
+  }
 }
 
 class ChatSession {
@@ -48,6 +75,26 @@ class ChatSession {
     required this.messages,
     this.isNew = true,
   });
+
+  factory ChatSession.fromJson(Map<String, dynamic> json) {
+    return ChatSession(
+      id: json['id'],
+      title: json['title'],
+      messages: (json['messages'] as List)
+          .map((message) => ChatMessage.fromJson(message))
+          .toList(),
+      isNew: json['isNew'] ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'messages': messages.map((message) => message.toJson()).toList(),
+      'isNew': isNew,
+    };
+  }
 
   // A method to create a summary for the title
   void generateTitleFromFirstMessage() {

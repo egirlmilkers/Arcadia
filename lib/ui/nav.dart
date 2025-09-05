@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+
 import 'package:flutter_animate/flutter_animate.dart';
+
+import '../main.dart';
 import 'settings.dart';
 
 class SideNav extends StatelessWidget {
@@ -7,6 +10,8 @@ class SideNav extends StatelessWidget {
   final bool isExpanded;
   final bool isPinned;
   final VoidCallback onToggle;
+  final List<ChatSession> chatHistory;
+  final Function(ChatSession) onChatSelected;
 
   const SideNav({
     super.key,
@@ -14,6 +19,8 @@ class SideNav extends StatelessWidget {
     required this.isExpanded,
     required this.isPinned,
     required this.onToggle,
+    required this.chatHistory,
+    required this.onChatSelected,
   });
 
   @override
@@ -68,21 +75,16 @@ class SideNav extends StatelessWidget {
                   ),
                 if (isExpanded)
                   Expanded(
-                    child: ListView(
-                      children: [
-                        ListTile(
+                    child: ListView.builder(
+                      itemCount: chatHistory.length,
+                      itemBuilder: (context, index) {
+                        final chat = chatHistory[index];
+                        return ListTile(
                           leading: const Icon(Icons.chat_bubble_outline),
-                          title: const Text("Recipe for a great weekend..."),
-                          onTap: () {},
-                        ),
-                        ListTile(
-                          leading: const Icon(Icons.chat_bubble_outline),
-                          title: const Text(
-                            "Flutter state management explained",
-                          ),
-                          onTap: () {},
-                        ),
-                      ],
+                          title: Text(chat.title),
+                          onTap: () => onChatSelected(chat),
+                        );
+                      },
                     ),
                   ),
                 const Spacer(),
@@ -122,6 +124,7 @@ class CustomNavButton extends StatelessWidget {
   final Color? foregroundColor;
 
   const CustomNavButton({
+    super.key,
     required this.isExpanded,
     required this.onPressed,
     required this.icon,

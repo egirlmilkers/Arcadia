@@ -1,7 +1,7 @@
 name: arcadia
 description: A Flutter clone of the Gemini UI.
 publish_to: 'none'
-version: 1.0.0+9
+version: 1.0.0+10
 
 
 environment:
@@ -29,6 +29,12 @@ dependencies:
   file_picker: ^10.3.2
   # For toast notifs
   toastification: ^3.0.3
+  # For REST API
+  http: ^1.5.0
+  # For getting common paths
+  path_provider: ^2.1.5
+  # For getting uuids obviously
+  uuid: ^4.5.1
 
 
 dev_dependencies:
