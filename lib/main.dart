@@ -21,7 +21,13 @@ void main() {
 class ChatMessage {
   final String text;
   final bool isUser;
-  ChatMessage({required this.text, required this.isUser});
+  final List<String> attachments;
+
+  ChatMessage({
+    required this.text,
+    required this.isUser,
+    this.attachments = const [],
+  });
 }
 
 class ChatSession {
