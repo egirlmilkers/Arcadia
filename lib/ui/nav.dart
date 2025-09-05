@@ -20,7 +20,7 @@ class SideNav extends StatelessWidget {
 
     return AnimatedContainer(
       duration: 200.ms,
-      width: isExpanded ? 280 : 80,
+      width: isExpanded ? 280 : 74,
       color: theme.colorScheme.surfaceContainerLowest,
       child: ClipRect(
         child: OverflowBox(
@@ -30,8 +30,10 @@ class SideNav extends StatelessWidget {
           maxWidth: 280,
           alignment: Alignment.centerLeft,
           child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
             child: Column(
               // With OverflowBox, we must always align content to the start.
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -39,50 +41,16 @@ class SideNav extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.menu),
                   onPressed: onToggle,
-                  style: IconButton.styleFrom(
-                    minimumSize: const Size(48, 48),
-                    padding: EdgeInsets.zero,
-                  ),
                 ),
-                const SizedBox(height: 16),
-                // The Center widget has been removed to ensure left alignment during animation.
-                isExpanded
-                    ? ElevatedButton(
-                        onPressed: onNewChat,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.colorScheme.primaryContainer,
-                          foregroundColor:
-                              theme.colorScheme.onPrimaryContainer,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          minimumSize: const Size(double.infinity, 48),
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 16.0),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.edit_note),
-                            SizedBox(width: 8),
-                            Text("New Chat"),
-                          ],
-                        ),
-                      )
-                    : ElevatedButton(
-                        onPressed: onNewChat,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.colorScheme.primaryContainer,
-                          foregroundColor:
-                              theme.colorScheme.onPrimaryContainer,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          minimumSize: const Size(48, 48),
-                          padding: EdgeInsets.zero,
-                        ),
-                        child: const Icon(Icons.edit_note),
-                      ),
+                const SizedBox(height: 10),
+                CustomNavButton(
+                  isExpanded: isExpanded,
+                  onPressed: onNewChat,
+                  icon: Icons.rate_review_outlined,
+                  label: "New Chat",
+                  backgroundColor: theme.colorScheme.primaryContainer,
+                  foregroundColor: theme.colorScheme.onPrimaryContainer,
+                ),
                 const SizedBox(height: 24),
                 if (isExpanded)
                   Padding(
@@ -95,14 +63,14 @@ class SideNav extends StatelessWidget {
                       children: [
                         ListTile(
                           leading: const Icon(Icons.chat_bubble_outline),
-                          title:
-                              const Text("Recipe for a great weekend..."),
+                          title: const Text("Recipe for a great weekend..."),
                           onTap: () {},
                         ),
                         ListTile(
                           leading: const Icon(Icons.chat_bubble_outline),
                           title: const Text(
-                              "Flutter state management explained"),
+                            "Flutter state management explained",
+                          ),
                           onTap: () {},
                         ),
                       ],
@@ -115,32 +83,62 @@ class SideNav extends StatelessWidget {
                   width: isExpanded ? 280 - 32 : 80 - 32,
                   color: theme.dividerColor,
                 ),
-                isExpanded
-                    ? ListTile(
-                        leading: const Icon(Icons.settings_outlined),
-                        title: const Text("Settings"),
-                        onTap: () {
-                          Navigator.of(context).push(MaterialPageRoute(
-                            builder: (context) => const SettingsPage(),
-                          ));
-                        },
-                      )
-                    : IconButton(
-                        icon: const Icon(Icons.settings_outlined),
-                        onPressed: () {
-                          Navigator.of(context).push(MaterialPageRoute(
-                            builder: (context) => const SettingsPage(),
-                          ));
-                        },
-                        style: IconButton.styleFrom(
-                          minimumSize: const Size(48, 48),
-                          padding: EdgeInsets.zero,
-                        ),
+                CustomNavButton(
+                  isExpanded: isExpanded,
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const SettingsPage(),
                       ),
+                    );
+                  },
+                  icon: Icons.settings,
+                  label: "Settings",
+                ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class CustomNavButton extends StatelessWidget {
+  final bool isExpanded;
+  final VoidCallback onPressed;
+  final IconData icon;
+  final String label;
+  final Color? backgroundColor;
+  final Color? foregroundColor;
+
+  const CustomNavButton({
+    required this.isExpanded,
+    required this.onPressed,
+    required this.icon,
+    required this.label,
+    this.backgroundColor,
+    this.foregroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        minimumSize: Size(isExpanded ? double.infinity : 48, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 12.0),
+        backgroundColor: backgroundColor,
+        foregroundColor: foregroundColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        alignment: Alignment.centerLeft,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon),
+          if (isExpanded) ...[const SizedBox(width: 8), Text(label)],
+        ],
       ),
     );
   }
