@@ -109,7 +109,12 @@ class SideNav extends StatelessWidget {
                     ),
                   ),
                 const Spacer(),
-                const Divider(),
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 8.0),
+                  height: 1,
+                  width: isExpanded ? 280 - 32 : 80 - 32,
+                  color: theme.dividerColor,
+                ),
                 isExpanded
                     ? ListTile(
                         leading: const Icon(Icons.settings_outlined),

@@ -17,7 +17,7 @@ class MainUI extends StatefulWidget {
 
 class _MainUIState extends State<MainUI> {
   List<ChatMessage>? _activeChat;
-  bool _isSidebarExpanded = true;
+  bool _isPinned = true;
   bool _isHovering = false;
 
   void _startNewChat() {
@@ -39,13 +39,13 @@ class _MainUIState extends State<MainUI> {
 
   void _toggleSidebar() {
     setState(() {
-      _isSidebarExpanded = !_isSidebarExpanded;
+      _isPinned = !_isPinned;
     });
   }
 
   void _handleHover(bool hover) {
     // We only want to expand on hover if the sidebar is not pinned open
-    if (!_isSidebarExpanded) {
+    if (!_isPinned) {
       setState(() {
         _isHovering = hover;
       });
@@ -58,7 +58,7 @@ class _MainUIState extends State<MainUI> {
     final theme = Theme.of(context);
     final gradientColors = themeManager.currentTheme?.gradientColors ??
         [theme.colorScheme.primary, theme.colorScheme.tertiary];
-    final bool isEffectivelyExpanded = _isSidebarExpanded || _isHovering;
+    final bool isEffectivelyExpanded = _isPinned || _isHovering;
 
     return Scaffold(
       body: Row(
@@ -100,7 +100,7 @@ class _MainUIState extends State<MainUI> {
                 Expanded(
                   child: AnimatedContainer(
                     duration: 200.ms,
-                    margin: EdgeInsets.only(left: _isSidebarExpanded ? 0 : 20),
+                    margin: EdgeInsets.only(left: _isPinned ? 0 : 20),
                     child: _activeChat == null
                         ? const WelcomeUI()
                         : ChatUI(messages: _activeChat!),
