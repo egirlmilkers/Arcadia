@@ -23,10 +23,7 @@ class _MainUIState extends State<MainUI> {
   void _startNewChat() {
     setState(() {
       _activeChat = [
-        ChatMessage(
-          text: "Hi there! How can I help you today?",
-          isUser: false,
-        ),
+        ChatMessage(text: "Hi there! How can I help you today?", isUser: false),
       ];
     });
   }
@@ -56,23 +53,17 @@ class _MainUIState extends State<MainUI> {
   Widget build(BuildContext context) {
     final themeManager = context.watch<ThemeManager>();
     final theme = Theme.of(context);
-    final gradientColors = themeManager.currentTheme?.gradientColors ??
+    final gradientColors =
+        themeManager.currentTheme?.gradientColors ??
         [theme.colorScheme.primary, theme.colorScheme.tertiary];
     final bool isEffectivelyExpanded = _isPinned || _isHovering;
 
     return Scaffold(
-      body: Row(
+      body: Stack(
         children: [
-          MouseRegion(
-            onEnter: (_) => _handleHover(true),
-            onExit: (_) => _handleHover(false),
-            child: SideNav(
-              onNewChat: _startNewChat,
-              isExpanded: isEffectivelyExpanded,
-              onToggle: _toggleSidebar,
-            ),
-          ),
-          Expanded(
+          AnimatedPadding(
+            duration: 200.ms,
+            padding: EdgeInsets.only(left: _isPinned ? 280 : 74),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -98,15 +89,21 @@ class _MainUIState extends State<MainUI> {
                   ),
                 ),
                 Expanded(
-                  child: AnimatedContainer(
-                    duration: 200.ms,
-                    margin: EdgeInsets.only(left: _isPinned ? 0 : 20),
-                    child: _activeChat == null
-                        ? const WelcomeUI()
-                        : ChatUI(messages: _activeChat!),
-                  ),
+                  child: _activeChat == null
+                      ? const WelcomeUI()
+                      : ChatUI(messages: _activeChat!),
                 ),
               ],
+            ),
+          ),
+          MouseRegion(
+            onEnter: (_) => _handleHover(true),
+            onExit: (_) => _handleHover(false),
+            child: SideNav(
+              onNewChat: _startNewChat,
+              isExpanded: isEffectivelyExpanded,
+              isPinned: _isPinned,
+              onToggle: _toggleSidebar,
             ),
           ),
         ],

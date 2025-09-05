@@ -62,10 +62,9 @@ class _ChatUIState extends State<ChatUI> {
             itemCount: widget.messages.length,
             itemBuilder: (context, index) {
               final message = widget.messages[index];
-              return MessageBubble(message: message)
-                  .animate()
-                  .fadeIn(duration: 500.ms)
-                  .slideY(begin: 0.5);
+              return MessageBubble(
+                message: message,
+              ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.5);
             },
           ),
         ),

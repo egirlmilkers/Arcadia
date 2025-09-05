@@ -5,12 +5,14 @@ import 'settings.dart';
 class SideNav extends StatelessWidget {
   final VoidCallback onNewChat;
   final bool isExpanded;
+  final bool isPinned;
   final VoidCallback onToggle;
 
   const SideNav({
     super.key,
     required this.onNewChat,
     required this.isExpanded,
+    required this.isPinned,
     required this.onToggle,
   });
 
@@ -39,7 +41,14 @@ class SideNav extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.menu),
+                  icon: AnimatedRotation(
+                    // Match the duration of your AnimatedContainer
+                    duration: 200.ms,
+                    turns: isPinned ? 0.0 : 0.25, // 0.0 = down, 0.25 = left
+                    child: Icon(
+                      isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                    ),
+                  ),
                   onPressed: onToggle,
                 ),
                 const SizedBox(height: 10),
