@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../main.dart';
@@ -30,6 +31,19 @@ class _MainUIState extends State<MainUI> {
   void initState() {
     super.initState();
     _loadChatHistory();
+    _loadPinState();
+  }
+
+  void _loadPinState() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isPinned = prefs.getBool('isPinned') ?? true;
+    });
+  }
+
+  void _savePinState(bool isPinned) async {
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setBool('isPinned', isPinned);
   }
 
   void _loadChatHistory() async {
@@ -39,14 +53,12 @@ class _MainUIState extends State<MainUI> {
 
   void _startNewChat() {
     setState(() {
-      final newChat = ChatSession(
+      _activeChat = ChatSession(
         id: Uuid().v4(),
         title: 'New Chat',
         messages: [],
+        isNew: true,
       );
-      _chatHistory.insert(0, newChat);
-      _activeChat = newChat;
-      _chatHistoryService.saveChats(_chatHistory);
     });
   }
 
@@ -65,6 +77,7 @@ class _MainUIState extends State<MainUI> {
   void _toggleSidebar() {
     setState(() {
       _isPinned = !_isPinned;
+      _savePinState(_isPinned);
     });
   }
 
@@ -119,6 +132,7 @@ class _MainUIState extends State<MainUI> {
                 actions: [
                   if (!modelManager.loading)
                     PopupMenuButton<String>(
+                      tooltip: "Choose your model",
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24),
                       ),
@@ -167,6 +181,12 @@ class _MainUIState extends State<MainUI> {
                         : ChatUI(
                             chatSession: _activeChat!,
                             selectedModel: modelManager.selectedModel.modelName,
+                            onNewMessage: (String title) {
+                              _loadChatHistory();
+                              setState(() {
+                                _activeChat!.title = title;
+                              });
+                            },
                           ),
                   ),
                 ],

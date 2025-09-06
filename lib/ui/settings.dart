@@ -55,7 +55,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
     if (mounted) {
       setState(() {
-        _version = packageInfo.version;
+        _version = '${packageInfo.version} (${packageInfo.buildNumber})';
         _platformInfo = platform;
       });
     }

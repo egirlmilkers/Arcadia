@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import 'package:provider/provider.dart';
@@ -7,8 +9,15 @@ import 'package:uuid/uuid.dart';
 import 'services/model.dart';
 import 'theme/manager.dart';
 import 'ui/main.dart';
+import 'util.dart';
+
 
 void main() {
+  if (Platform.isWindows) {
+    // fixes clipboard history flutter bug
+    WindowsInjector.instance.injectKeyData();
+  }
+
   WidgetsFlutterBinding.ensureInitialized();
   runApp(
     MultiProvider(
@@ -24,17 +33,17 @@ void main() {
 // TODO:
 // - Attachment display
 // - thinking dropdown
-// - Stop model
-// - WIN + V doesn't work
-// - new chat only if a message is sent
 // - make markdown work
 // - chat list not filling all space
 // - chat management
-// - remember pin state
-// - about should show build number as well
 // - loading spinner
-// - move collapse button
 // - model highlight should only highlight button
+// - fix chat files
+// - chat change animation
+// - fix api errors from sending in chat
+// - only show action buttons for latest and hovered over msg
+// - remove sent message and put text back in text box on api fail
+// - chat switching error
 
 // --- DATA MODELS ---
 

@@ -1,14 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-
-import 'package:flutter/foundation.dart';
-// Note: We are no longer using the 'http' package directly in the isolate.
-// import 'package:http/http.dart' as http;
+import 'dart:isolate';
 
 import '../main.dart';
 
-Future<String> _generateContentIsolate(Map<String, dynamic> params) async {
+void _generateContentIsolate(Map<String, dynamic> params) async {
+  final mainSendPort = params['sendPort'] as SendPort;
+  final receivePort = ReceivePort();
+  mainSendPort.send(receivePort.sendPort);
+
   final String apiKey = params['apiKey'];
   final String model = params['model'];
   final List<ChatMessage> messages = (params['messages'] as List)
@@ -16,69 +17,83 @@ Future<String> _generateContentIsolate(Map<String, dynamic> params) async {
       .toList();
 
   const String host = 'generativelanguage.googleapis.com';
-  
-  InternetAddress? ipAddress;
-  try {
-    final addresses = await InternetAddress.lookup(host, type: InternetAddressType.IPv4);
-    if (addresses.isNotEmpty) {
-      ipAddress = addresses.first;
-    } else {
-      return 'Error: Could not resolve DNS for API host (IPv4).';
+
+  HttpClient? client = HttpClient();
+  var requestCancelled = false;
+
+  receivePort.listen((message) {
+    if (message == 'cancel') {
+      requestCancelled = true;
+      client?.close(force: true);
+      client = null;
+      receivePort.close();
     }
-  } on SocketException catch (e) {
-    return 'Error: DNS lookup failed. Code: ${e.osError?.errorCode}, Message: ${e.osError?.message}';
-  }
+  });
 
-  final url = Uri.parse(
-    'https://${ipAddress.address}/v1beta/models/$model:generateContent',
-  );
-
-  var history = List.of(messages);
-  final firstUserIndex = history.indexWhere((m) => m.isUser);
-  if (firstUserIndex == -1) {
-    return "Error: Cannot send a message without user input.";
-  }
-  history = history.sublist(firstUserIndex);
-
-  final body = {
-    'contents': history.map((message) {
-      return {
-        'role': message.isUser ? 'user' : 'model',
-        'parts': [
-          {'text': message.text},
-        ],
-      };
-    }).toList(),
-  };
-
-  HttpClient? client;
   try {
-    // Create a low-level HttpClient.
-    client = HttpClient();
-    
-    // This callback is the core of the fix. It's called when the certificate
-    // name doesn't match the host we are connecting to (our IP address).
-    client.badCertificateCallback = (X509Certificate cert, String connectedHost, int port) {
-      // We return 'true' if the certificate's subject Common Name (CN) is for the
-      // googleapis.com domain. This tells the client to trust the certificate
-      // despite the mismatch, preventing the exception that crashes the VM.
-      return cert.subject.contains('CN=*.googleapis.com');
+    InternetAddress? ipAddress;
+    try {
+      final addresses = await InternetAddress.lookup(
+        host,
+        type: InternetAddressType.IPv4,
+      );
+      if (addresses.isNotEmpty) {
+        ipAddress = addresses.first;
+      } else {
+        mainSendPort.send('Error: Could not resolve DNS for API host (IPv4).');
+        return;
+      }
+    } on SocketException catch (e) {
+      mainSendPort.send(
+        'Error: DNS lookup failed. Code: ${e.osError?.errorCode}, Message: ${e.osError?.message}',
+      );
+      return;
+    }
+
+    if (requestCancelled) {
+      mainSendPort.send(GeminiService.cancelledResponse);
+      return;
+    }
+
+    final url = Uri.parse(
+      'https://${ipAddress.address}/v1beta/models/$model:generateContent',
+    );
+
+    var history = List.of(messages);
+    final firstUserIndex = history.indexWhere((m) => m.isUser);
+    if (firstUserIndex == -1) {
+      mainSendPort.send("Error: Cannot send a message without user input.");
+      return;
+    }
+    history = history.sublist(firstUserIndex);
+
+    final body = {
+      'contents': history.map((message) {
+        return {
+          'role': message.isUser ? 'user' : 'model',
+          'parts': [
+            {'text': message.text},
+          ],
+        };
+      }).toList(),
     };
 
-    // Manually open the request to our IP-based URL.
-    final request = await client.postUrl(url);
+    client!.badCertificateCallback =
+        (X509Certificate cert, String connectedHost, int port) {
+          return cert.subject.contains('CN=*.googleapis.com');
+        };
 
-    // Set the necessary headers. The 'Host' header is still essential.
+    final request = await client!.postUrl(url);
+
     request.headers.set('Host', host);
     request.headers.set('x-goog-api-key', apiKey);
     request.headers.set('Content-Type', 'application/json; charset=UTF-8');
-    
-    // Write the body and close the request to send it.
+
     request.write(jsonEncode(body));
     final response = await request.close().timeout(const Duration(seconds: 60));
 
     final responseBody = await response.transform(utf8.decoder).join();
-    
+
     if (response.statusCode == 200) {
       final jsonResponse = jsonDecode(responseBody);
       if (jsonResponse['candidates'] != null &&
@@ -86,25 +101,39 @@ Future<String> _generateContentIsolate(Map<String, dynamic> params) async {
           jsonResponse['candidates'][0]['content'] != null &&
           jsonResponse['candidates'][0]['content']['parts'] != null &&
           jsonResponse['candidates'][0]['content']['parts'].isNotEmpty) {
-        return jsonResponse['candidates'][0]['content']['parts'][0]['text'];
+        mainSendPort.send(
+          jsonResponse['candidates'][0]['content']['parts'][0]['text'],
+        );
       } else {
-        return 'Error: Invalid response structure from API.';
+        mainSendPort.send('Error: Invalid response structure from API.');
       }
     } else {
-      return 'Error: ${response.statusCode} - $responseBody';
+      mainSendPort.send('Error: ${response.statusCode} - $responseBody');
     }
   } on TimeoutException catch (_) {
-    return 'Error: The request to the server timed out. Please try again.';
+    if (!requestCancelled) {
+      mainSendPort.send(
+        'Error: The request to the server timed out. Please try again.',
+      );
+    }
   } catch (e) {
-    return 'Error making API call: $e';
+    if (!requestCancelled) {
+      mainSendPort.send('Error making API call: $e');
+    } else {
+      mainSendPort.send(GeminiService.cancelledResponse);
+    }
   } finally {
-    // It's crucial to close the HttpClient to free up resources.
     client?.close();
+    receivePort.close();
   }
 }
 
 class GeminiService {
   final String apiKey;
+  SendPort? _sendPort;
+  Isolate? _isolate;
+
+  static const String cancelledResponse = 'GEMINI_RESPONSE_CANCELLED';
 
   GeminiService({required this.apiKey});
 
@@ -112,12 +141,38 @@ class GeminiService {
     List<ChatMessage> messages,
     String model,
   ) async {
+    final completer = Completer<String>();
+    final receivePort = ReceivePort();
+
     final messagesAsJson = messages.map((m) => m.toJson()).toList();
 
-    return compute(_generateContentIsolate, {
+    _isolate = await Isolate.spawn(_generateContentIsolate, {
+      'sendPort': receivePort.sendPort,
       'apiKey': apiKey,
       'model': model,
       'messages': messagesAsJson,
     });
+
+    receivePort.listen((data) {
+      if (data is SendPort) {
+        _sendPort = data;
+      } else if (data is String) {
+        completer.complete(data);
+        receivePort.close();
+        _isolate?.kill();
+        _isolate = null;
+        _sendPort = null;
+      }
+    });
+
+    return completer.future;
+  }
+
+  void cancel() {
+    if (_isolate != null) {
+      _sendPort?.send('cancel');
+      _isolate = null;
+      _sendPort = null;
+    }
   }
 }
