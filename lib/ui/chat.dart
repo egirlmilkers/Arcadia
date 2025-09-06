@@ -54,10 +54,10 @@ class _ChatUIState extends State<ChatUI> {
     });
     _scrollToBottom();
 
-    final bool isNewChat = widget.chatSession.isNew;
+    // A new chat is defined by having only one message from the user
+    final bool isNewChat = widget.chatSession.messages.length == 1;
     if (isNewChat) {
       widget.chatSession.generateTitleFromFirstMessage();
-      widget.chatSession.isNew = false;
     }
 
     // A local function to clean up the UI on a failed attempt (either cancel or error)
@@ -103,24 +103,11 @@ class _ChatUIState extends State<ChatUI> {
       });
       _scrollToBottom();
 
-      // Save chat on first message
+      await _chatHistoryService.saveChat(widget.chatSession);
       if (isNewChat) {
-        final chats = await _chatHistoryService.loadChats();
-        chats.insert(0, widget.chatSession);
-        await _chatHistoryService.saveChats(chats);
         widget.onNewMessage?.call(widget.chatSession.title);
-      } else {
-        final chats = await _chatHistoryService.loadChats();
-        final index = chats.indexWhere(
-          (chat) => chat.id == widget.chatSession.id,
-        );
-        if (index != -1) {
-          chats[index] = widget.chatSession;
-          await _chatHistoryService.saveChats(chats);
-        }
       }
     } catch (e) {
-      // will only run for genuine errors
       revertOptimisticUI();
 
       toastification.show(
@@ -397,44 +384,44 @@ class _MessageBubbleState extends State<MessageBubble> {
             maxWidth: isUser ? 500 : MediaQuery.of(context).size.width * 0.75,
             minWidth: 150,
           ),
-          child: IntrinsicWidth(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: isUser
-                  ? MainAxisAlignment.spaceBetween
-                  : MainAxisAlignment.start,
-              children: [
-                if (!isUser)
-                  AnimatedOpacity(
-                    opacity: shouldShowButtons ? 1.0 : 0.0,
-                    duration: 200.ms,
-                    child: _buildActionBar(context, isUser),
-                  ),
-                if (!isUser) const SizedBox(width: 8.0),
-                Flexible(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (widget.message.text.isNotEmpty)
-                        GptMarkdown(
-                          messageText,
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            color: isUser
-                                ? theme.colorScheme.onPrimaryContainer
-                                : theme.colorScheme.onSurface,
-                          ),
-                        ),
-                    ],
-                  ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: isUser
+                ? MainAxisAlignment.spaceBetween
+                : MainAxisAlignment.start,
+            children: [
+              if (!isUser)
+                AnimatedOpacity(
+                  opacity: shouldShowButtons ? 1.0 : 0.0,
+                  duration: 200.ms,
+                  child: _buildActionBar(context, isUser),
                 ),
-                if (isUser)
-                  AnimatedOpacity(
-                    opacity: shouldShowButtons ? 1.0 : 0.0,
-                    duration: 200.ms,
-                    child: _buildActionBar(context, isUser),
-                  ),
-              ],
-            ),
+              if (!isUser) const SizedBox(width: 8.0),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (widget.message.text.isNotEmpty)
+                      GptMarkdown(
+                        messageText,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: isUser
+                              ? theme.colorScheme.onPrimaryContainer
+                              : theme.colorScheme.onSurface,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (isUser) const SizedBox(width: 8.0),
+              if (isUser)
+                AnimatedOpacity(
+                  opacity: shouldShowButtons ? 1.0 : 0.0,
+                  duration: 200.ms,
+                  child: _buildActionBar(context, isUser),
+                ),
+            ],
           ),
         ),
       ),

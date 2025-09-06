@@ -11,7 +11,6 @@ import 'theme/manager.dart';
 import 'ui/main.dart';
 import 'util.dart';
 
-
 void main() {
   if (Platform.isWindows) {
     // fixes clipboard history flutter bug
@@ -33,12 +32,14 @@ void main() {
 // TODO:
 // - Attachment display
 // - thinking dropdown
-// - chat list not filling all space
-// - chat management
 // - loading spinner
-// - model highlight should only highlight button
-// - fix chat files
 // - able to scroll from bg
+
+// Future updates:
+// - pinning chats
+// - drag and drop files
+// - view archived chats
+// - ai generated chat names
 // - logs with every ui element interaction logged
 
 // --- DATA MODELS ---
@@ -79,14 +80,9 @@ class ChatSession {
   final String id;
   String title;
   final List<ChatMessage> messages;
-  bool isNew; // To track if it should be saved
 
-  ChatSession({
-    required this.id,
-    required this.title,
-    required this.messages,
-    this.isNew = true,
-  });
+  ChatSession({String? id, required this.title, required this.messages})
+    : id = id ?? Uuid().v4();
 
   factory ChatSession.fromJson(Map<String, dynamic> json) {
     return ChatSession(
@@ -95,7 +91,6 @@ class ChatSession {
       messages: (json['messages'] as List)
           .map((message) => ChatMessage.fromJson(message))
           .toList(),
-      isNew: json['isNew'] ?? false,
     );
   }
 
@@ -104,7 +99,6 @@ class ChatSession {
       'id': id,
       'title': title,
       'messages': messages.map((message) => message.toJson()).toList(),
-      'isNew': isNew,
     };
   }
 

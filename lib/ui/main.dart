@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
 
 import '../main.dart';
 import '../services/chat_history.dart';
@@ -53,13 +52,23 @@ class _MainUIState extends State<MainUI> {
 
   void _startNewChat() {
     setState(() {
-      _activeChat = ChatSession(
-        id: Uuid().v4(),
-        title: 'New Chat',
-        messages: [],
-        isNew: true,
-      );
+      _activeChat = ChatSession(title: 'New Chat', messages: []);
     });
+  }
+
+  void _deleteChat(ChatSession chat) async {
+    await _chatHistoryService.deleteChat(chat);
+    _loadChatHistory();
+  }
+
+  void _archiveChat(ChatSession chat) async {
+    await _chatHistoryService.archiveChat(chat);
+    _loadChatHistory();
+  }
+
+  void _renameChat(ChatSession chat, String newTitle) async {
+    await _chatHistoryService.renameChat(chat, newTitle);
+    _loadChatHistory();
   }
 
   void _selectChat(ChatSession chat) {
@@ -131,41 +140,117 @@ class _MainUIState extends State<MainUI> {
                 ),
                 actions: [
                   if (!modelManager.loading)
-                    PopupMenuButton<String>(
-                      tooltip: "Choose your model",
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      onSelected: (String modelName) {
-                        modelManager.setSelectedModel(modelName);
-                      },
-                      itemBuilder: (BuildContext context) {
-                        return modelManager.models.map((Model model) {
-                          return PopupMenuItem<String>(
-                            value: model.modelName,
-                            child: ListTile(
-                              title: Text(model.displayName),
-                              subtitle: Text(model.subtitle),
-                            ),
-                          );
-                        }).toList();
-                      },
-                      child: Card(
-                        color: theme.colorScheme.surfaceContainer,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          child: Row(
-                            children: [
-                              Text(modelManager.selectedModel.displayName),
-                              const Icon(Icons.arrow_drop_down),
-                            ],
-                          ),
+                    Center(
+                      child: Tooltip(
+                        message: "Choose your model",
+                        child: Builder(
+                          // A Builder is used here to get a specific context for the button,
+                          // which is needed to calculate its position on the screen for `showMenu`.
+                          builder: (BuildContext context) {
+                            return Material(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainer,
+                              borderRadius: BorderRadius.circular(24),
+                              clipBehavior: Clip
+                                  .antiAlias, // Ensures the InkWell ripple is clipped
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(24),
+                                onTap: () {
+                                  // THIS IS THE SIMPLIFIED PART
+                                  final RenderBox button =
+                                      context.findRenderObject() as RenderBox;
+                                  final RenderBox overlay =
+                                      Overlay.of(
+                                            context,
+                                          ).context.findRenderObject()
+                                          as RenderBox;
+
+                                  // 1. Get the button's position and size in the overlay's coordinate system.
+                                  final Rect buttonRect = Rect.fromPoints(
+                                    button.localToGlobal(
+                                      Offset.zero,
+                                      ancestor: overlay,
+                                    ),
+                                    button.localToGlobal(
+                                      button.size.bottomRight(Offset.zero),
+                                      ancestor: overlay,
+                                    ),
+                                  );
+
+                                  // 2. offset the menu to show next to the dropdown button
+                                  final Rect shiftedButtonRect = buttonRect
+                                      .translate(-110.0, 0.0);
+
+                                  // 3. Create the RelativeRect for the menu's position.
+                                  final RelativeRect position =
+                                      RelativeRect.fromRect(
+                                        shiftedButtonRect,
+                                        Offset.zero & overlay.size,
+                                      );
+
+                                  // Show the menu anchored to the button's calculated position.
+                                  showMenu<String>(
+                                    context: context,
+                                    position: position,
+                                    menuPadding: EdgeInsets.zero,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(18),
+                                    ),
+                                    clipBehavior: Clip.antiAlias,
+                                    items: modelManager.models.map((
+                                      Model model,
+                                    ) {
+                                      return PopupMenuItem<String>(
+                                        value: model.modelName,
+                                        padding: const EdgeInsets.all(12),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(model.displayName),
+                                            Text(
+                                              model.subtitle,
+                                              style: theme.textTheme.bodySmall
+                                                  ?.copyWith(
+                                                    color: theme
+                                                        .colorScheme
+                                                        .onSurfaceVariant,
+                                                  ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ).then((String? value) {
+                                    // This is the equivalent of `onSelected`.
+                                    if (value != null) {
+                                      modelManager.setSelectedModel(value);
+                                    }
+                                  });
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.only(
+                                    left: 16,
+                                    right: 8,
+                                    top: 8,
+                                    bottom: 8,
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize
+                                        .min, // Fit the row to its content
+                                    children: [
+                                      Text(
+                                        modelManager.selectedModel.displayName,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      const Icon(Icons.arrow_drop_down),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ),
                     ),
@@ -215,6 +300,9 @@ class _MainUIState extends State<MainUI> {
               onToggle: _toggleSidebar,
               chatHistory: _chatHistory,
               onChatSelected: _selectChat,
+              onDeleteChat: _deleteChat,
+              onArchiveChat: _archiveChat,
+              onRenameChat: _renameChat,
             ),
           ),
         ],

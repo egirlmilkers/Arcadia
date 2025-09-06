@@ -6,39 +6,80 @@ import 'package:path_provider/path_provider.dart';
 import '../main.dart';
 
 class ChatHistoryService {
-  Future<File> get _localFile async {
-    final directory = await getApplicationDocumentsDirectory();
-    return File('${directory.path}/chat_history.json');
+  Future<Directory> _getChatsDirectory() async {
+    final docs = await getApplicationDocumentsDirectory();
+    final chatsDir = Directory('${docs.path}/Arcadia/chats');
+    if (!await chatsDir.exists()) {
+      await chatsDir.create(recursive: true);
+    }
+    return chatsDir;
   }
 
   Future<List<ChatSession>> loadChats() async {
     try {
-      final file = await _localFile;
-      if (!await file.exists()) {
-        return [];
+      final chatsDir = await _getChatsDirectory();
+      final chatFiles = chatsDir.listSync().where(
+        (f) => f.path.endsWith('.json'),
+      );
+
+      final chats = <ChatSession>[];
+      for (final file in chatFiles) {
+        final content = await (file as File).readAsString();
+        final json = jsonDecode(content);
+        chats.add(ChatSession.fromJson(json));
       }
-      final contents = await file.readAsString();
-      final List<dynamic> json = jsonDecode(contents);
-      return json.map((chat) => ChatSession.fromJson(chat)).toList();
+      return chats;
     } catch (e) {
       print('Error loading chats: $e');
       return [];
     }
   }
 
-  Future<void> saveChats(List<ChatSession> chats) async {
+  Future<void> saveChat(ChatSession chat) async {
     try {
-      final file = await _localFile;
-      final List<dynamic> json = chats.map((chat) => chat.toJson()).toList();
-      await file.writeAsString(jsonEncode(json));
+      final chatsDir = await _getChatsDirectory();
+      final file = File('${chatsDir.path}/${chat.id}.json');
+      await file.writeAsString(jsonEncode(chat.toJson()));
     } catch (e) {
-      print('Error saving chats: $e');
+      print('Error saving chat: $e');
+    }
+  }
+
+  Future<void> deleteChat(ChatSession chat) async {
+    try {
+      final chatsDir = await _getChatsDirectory();
+      final file = File('${chatsDir.path}/${chat.id}.json');
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (e) {
+      print('Error deleting chat: $e');
+    }
+  }
+
+  Future<void> renameChat(ChatSession chat, String newTitle) async {
+    chat.title = newTitle;
+    await saveChat(chat);
+  }
+
+  Future<void> archiveChat(ChatSession chat) async {
+    try {
+      final chatsDir = await _getChatsDirectory();
+      final archiveDir = Directory('${chatsDir.path}/archived');
+      if (!await archiveDir.exists()) {
+        await archiveDir.create(recursive: true);
+      }
+
+      final file = File('${chatsDir.path}/${chat.id}.json');
+      if (await file.exists()) {
+        await file.rename('${archiveDir.path}/${chat.id}.json');
+      }
+    } catch (e) {
+      print('Error archiving chat: $e');
     }
   }
 
   Future<void> addChat(ChatSession chat) async {
-    final chats = await loadChats();
-    chats.add(chat);
-    await saveChats(chats);
+    await saveChat(chat);
   }
 }

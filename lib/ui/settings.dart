@@ -22,7 +22,7 @@ class _SettingsPageState extends State<SettingsPage> {
   String _version = '...';
   String _platformInfo = '...';
   String _dynamicColorLabel = 'Dynamic Color';
-  String _apiKey = '...';
+  String? _apiKey;
 
   @override
   void initState() {
@@ -34,7 +34,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _loadApiKey() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _apiKey = prefs.getString('gemini_api_key') ?? 'Not set';
+      _apiKey = prefs.getString('gemini_api_key');
     });
   }
 
@@ -163,9 +163,17 @@ class _SettingsPageState extends State<SettingsPage> {
       builder: (context) {
         return AlertDialog(
           title: Text('Set API Key'),
-          content: TextField(
-            controller: controller,
-            decoration: InputDecoration(hintText: 'Enter your Gemini API Key'),
+          content: SizedBox(
+            width: 300,
+            child: TextField(
+              controller: controller,
+              obscureText: true,
+              maxLines: 1,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: 'Enter your Gemini API Key',
+              ),
+            ),
           ),
           actions: [
             TextButton(
@@ -278,8 +286,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   SettingsHeader('API'),
                   SettingsListTile(
                     title: 'Gemini API Key',
-                    subtitle: _apiKey.length > 4
-                        ? '••••••••${_apiKey.substring(_apiKey.length - 4)}'
+                    subtitle: _apiKey != null && _apiKey!.length > 4
+                        ? '••••••••${_apiKey!.substring(_apiKey!.length - 4)}'
                         : 'Not set',
                     onTap: _showApiKeyDialog,
                   ),
