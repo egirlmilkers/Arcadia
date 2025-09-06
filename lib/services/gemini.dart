@@ -90,7 +90,8 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
     request.headers.set('Content-Type', 'application/json; charset=UTF-8');
 
     request.write(jsonEncode(body));
-    final response = await request.close().timeout(const Duration(seconds: 60));
+
+    final response = await request.close();
 
     final responseBody = await response.transform(utf8.decoder).join();
 
@@ -110,17 +111,11 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
     } else {
       mainSendPort.send('Error: ${response.statusCode} - $responseBody');
     }
-  } on TimeoutException catch (_) {
-    if (!requestCancelled) {
-      mainSendPort.send(
-        'Error: The request to the server timed out. Please try again.',
-      );
-    }
   } catch (e) {
-    if (!requestCancelled) {
-      mainSendPort.send('Error making API call: $e');
-    } else {
+    if (requestCancelled) {
       mainSendPort.send(GeminiService.cancelledResponse);
+    } else {
+      mainSendPort.send('Error making API call: $e');
     }
   } finally {
     client?.close();

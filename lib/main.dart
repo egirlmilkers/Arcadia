@@ -33,17 +33,13 @@ void main() {
 // TODO:
 // - Attachment display
 // - thinking dropdown
-// - make markdown work
 // - chat list not filling all space
 // - chat management
 // - loading spinner
 // - model highlight should only highlight button
 // - fix chat files
-// - chat change animation
-// - fix api errors from sending in chat
-// - only show action buttons for latest and hovered over msg
-// - remove sent message and put text back in text box on api fail
-// - chat switching error
+// - able to scroll from bg
+// - logs with every ui element interaction logged
 
 // --- DATA MODELS ---
 

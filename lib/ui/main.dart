@@ -176,18 +176,30 @@ class _MainUIState extends State<MainUI> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: _activeChat == null
-                        ? const WelcomeUI()
-                        : ChatUI(
-                            chatSession: _activeChat!,
-                            selectedModel: modelManager.selectedModel.modelName,
-                            onNewMessage: (String title) {
-                              _loadChatHistory();
-                              setState(() {
-                                _activeChat!.title = title;
-                              });
-                            },
-                          ),
+                    child: AnimatedSwitcher(
+                      duration: 500.ms,
+                      transitionBuilder:
+                          (Widget child, Animation<double> animation) {
+                            return FadeTransition(
+                              opacity: animation,
+                              child: child,
+                            );
+                          },
+                      child: _activeChat == null
+                          ? const WelcomeUI()
+                          : ChatUI(
+                              key: ValueKey(_activeChat!.id),
+                              chatSession: _activeChat!,
+                              selectedModel:
+                                  modelManager.selectedModel.modelName,
+                              onNewMessage: (String title) {
+                                _loadChatHistory();
+                                setState(() {
+                                  _activeChat!.title = title;
+                                });
+                              },
+                            ),
+                    ),
                   ),
                 ],
               ),
