@@ -110,17 +110,6 @@ class ChatSession {
       'messages': messages.map((message) => message.toJson()).toList(),
     };
   }
-
-  // A method to create a summary for the title
-  void generateTitleFromFirstMessage() {
-    if (messages.length > 1 && messages[1].isUser) {
-      String text = messages[1].text;
-      title = text.split(' ').take(5).join(' ');
-      if (text.length > title.length) {
-        title += '...';
-      }
-    }
-  }
 }
 
 class Arcadia extends StatelessWidget {

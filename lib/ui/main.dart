@@ -31,6 +31,7 @@ class _MainUIState extends State<MainUI> {
     super.initState();
     _loadChatHistory();
     _loadPinState();
+    _startNewChat();
   }
 
   void _loadPinState() async {
@@ -127,6 +128,12 @@ class _MainUIState extends State<MainUI> {
     final themeManager = context.watch<ThemeManager>();
     final modelManager = context.watch<ModelManager>();
     final theme = Theme.of(context);
+
+    // Add this check at the top of the build method.
+    if (modelManager.loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     final gradientColors =
         themeManager.currentTheme?.gradientColors ??
         [theme.colorScheme.primary, theme.colorScheme.tertiary];
@@ -300,10 +307,20 @@ class _MainUIState extends State<MainUI> {
                               chatSession: _activeChat!,
                               selectedModel:
                                   modelManager.selectedModel.modelName,
-                              onNewMessage: (String title) {
-                                _loadChatHistory();
+                              onNewMessage: (String title) async {
+                                await _loadChatHistory();
                                 setState(() {
-                                  _activeChat!.title = title;
+                                  if (_activeChat != null) {
+                                    try {
+                                      final newActiveChat = _chatHistory
+                                          .firstWhere(
+                                            (c) => c.id == _activeChat!.id,
+                                          );
+                                      _activeChat = newActiveChat;
+                                    } catch (e) {
+                                      _activeChat = null;
+                                    }
+                                  }
                                 });
                               },
                             ),

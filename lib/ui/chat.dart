@@ -1,4 +1,3 @@
-import 'package:arcadia/ui/md/highlight.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,12 +9,14 @@ import 'package:toastification/toastification.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'welcome.dart';
+import 'md/code_block.dart';
+import 'md/highlight.dart';
 import '../main.dart';
 import '../services/chat_history.dart';
 import '../services/gemini.dart';
 import '../theme/manager.dart';
 import '../util.dart';
-import 'md/code_block.dart';
 
 class ChatUI extends StatefulWidget {
   final ChatSession chatSession;
@@ -60,9 +61,6 @@ class _ChatUIState extends State<ChatUI> {
 
     // A new chat is defined by having only one message from the user
     final bool isNewChat = widget.chatSession.messages.length == 1;
-    if (isNewChat) {
-      widget.chatSession.generateTitleFromFirstMessage();
-    }
 
     // A local function to clean up the UI on a failed attempt (either cancel or error)
     void revertOptimisticUI() {
@@ -79,11 +77,38 @@ class _ChatUIState extends State<ChatUI> {
         throw Exception("API key not set. Please set it in settings.");
       }
 
-      _geminiService = GeminiService(apiKey: apiKey);
-      final modelResponse = await _geminiService!.generateContent(
-        widget.chatSession.messages,
-        widget.selectedModel,
-      );
+      final titleService = GeminiService(apiKey: apiKey);
+      final contentService = GeminiService(apiKey: apiKey);
+      _geminiService = contentService;
+
+      String modelResponse;
+      if (isNewChat) {
+        final prompt =
+            'Generate a short, concise title (5 words max) for an ai chat started with this user query:\n\n$originalMessage';
+        final titleFuture = titleService.generateContent([
+          ChatMessage(text: prompt, isUser: true),
+        ], 'gemini-1.5-flash-latest');
+
+        final contentFuture = contentService.generateContent(
+          widget.chatSession.messages,
+          widget.selectedModel,
+        );
+
+        final results = await Future.wait([titleFuture, contentFuture]);
+        final newTitle = results[0];
+        modelResponse = results[1];
+
+        if (!newTitle.startsWith('Error:')) {
+          setState(() {
+            widget.chatSession.title = newTitle.replaceAll('"', '').trim();
+          });
+        }
+      } else {
+        modelResponse = await contentService.generateContent(
+          widget.chatSession.messages,
+          widget.selectedModel,
+        );
+      }
 
       // 1. Check for cancellation first.
       if (modelResponse == GeminiService.cancelledResponse) {
@@ -170,33 +195,41 @@ class _ChatUIState extends State<ChatUI> {
       child: Column(
         children: [
           Expanded(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 900),
-                child: ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(16.0),
-                  itemCount: widget.chatSession.messages.length,
-                  itemBuilder: (context, index) {
-                    final message = widget.chatSession.messages[index];
-                    final lastUserMessageIndex = widget.chatSession.messages
-                        .lastIndexWhere((m) => m.isUser);
-                    final lastAiMessageIndex = widget.chatSession.messages
-                        .lastIndexWhere((m) => !m.isUser);
+            child: widget.chatSession.messages.isEmpty
+                ? const WelcomeUI()
+                : Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 900),
+                      child: ListView.separated(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(16.0),
+                        itemCount: widget.chatSession.messages.length,
+                        itemBuilder: (context, index) {
+                          final message = widget.chatSession.messages[index];
+                          final lastUserMessageIndex = widget
+                              .chatSession
+                              .messages
+                              .lastIndexWhere((m) => m.isUser);
+                          final lastAiMessageIndex = widget.chatSession.messages
+                              .lastIndexWhere((m) => !m.isUser);
 
-                    final bool isLastUserMessage =
-                        index == lastUserMessageIndex;
-                    final bool isLastAiMessage = index == lastAiMessageIndex;
+                          final bool isLastUserMessage =
+                              index == lastUserMessageIndex;
+                          final bool isLastAiMessage =
+                              index == lastAiMessageIndex;
 
-                    return MessageBubble(
-                      message: message,
-                      isLastUserMessage: isLastUserMessage,
-                      isLastAiMessage: isLastAiMessage,
-                    );
-                  },
-                ),
-              ),
-            ),
+                          return MessageBubble(
+                            message: message,
+                            isLastUserMessage: isLastUserMessage,
+                            isLastAiMessage: isLastAiMessage,
+                          );
+                        },
+                        separatorBuilder: (context, index) {
+                          return const SizedBox(height: 20);
+                        }
+                      ),
+                    ),
+                  ),
           ),
           if (_isLoading)
             const Padding(

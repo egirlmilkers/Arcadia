@@ -126,7 +126,7 @@ class _SideNavState extends State<SideNav> {
                   Expanded(
                     child: Material(
                       type: MaterialType.transparency,
-                      child: ListView.builder(
+                      child: ListView.separated(
                         itemCount: widget.chatList.length,
                         itemBuilder: (context, index) {
                           final chat = widget.chatList[index];
@@ -140,6 +140,9 @@ class _SideNavState extends State<SideNav> {
                             onDelete: () => widget.onDeleteChat(chat),
                           );
                         },
+                        separatorBuilder: (context, index) {
+                          return const SizedBox(height: 6);
+                        }
                       ),
                     ),
                   ),
