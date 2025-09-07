@@ -45,9 +45,8 @@ class _MainUIState extends State<MainUI> {
     prefs.setBool('isPinned', isPinned);
   }
 
-  void _loadChatHistory() async {
+  Future<void> _loadChatHistory() async {
     _chatHistory = await _chatHistoryService.loadChats();
-    setState(() {});
   }
 
   void _startNewChat() {
@@ -57,18 +56,42 @@ class _MainUIState extends State<MainUI> {
   }
 
   void _deleteChat(ChatSession chat) async {
+    // If the active chat is the one being deleted, set it to null.
+    if (_activeChat?.id == chat.id) {
+      _activeChat = null;
+    }
     await _chatHistoryService.deleteChat(chat);
-    _loadChatHistory();
+    await _loadChatHistory();
+    setState(() {}); // Rebuild the UI with the updated list and active chat.
   }
 
   void _archiveChat(ChatSession chat) async {
+    // Archiving should also clear the active chat view.
+    if (_activeChat?.id == chat.id) {
+      _activeChat = null;
+    }
     await _chatHistoryService.archiveChat(chat);
-    _loadChatHistory();
+    await _loadChatHistory();
+    setState(() {});
   }
 
   void _renameChat(ChatSession chat, String newTitle) async {
+    final activeChatId = _activeChat?.id;
     await _chatHistoryService.renameChat(chat, newTitle);
-    _loadChatHistory();
+    await _loadChatHistory();
+
+    // If the renamed chat was the active one, find its new instance in the
+    // updated list and set it as the active chat. This ensures the title
+    // updates everywhere.
+    if (activeChatId == chat.id) {
+      try {
+        _activeChat = _chatHistory.firstWhere((c) => c.id == activeChatId);
+      } catch (e) {
+        // In case the chat was deleted by another process, handle it gracefully.
+        _activeChat = null;
+      }
+    }
+    setState(() {});
   }
 
   void _selectChat(ChatSession chat) {
@@ -294,11 +317,12 @@ class _MainUIState extends State<MainUI> {
             onEnter: (_) => _handleHover(true),
             onExit: (_) => _handleHover(false),
             child: SideNav(
+              selectedChat: _activeChat,
               onNewChat: _startNewChat,
               isExpanded: isEffectivelyExpanded,
               isPinned: _isPinned,
               onToggle: _toggleSidebar,
-              chatHistory: _chatHistory,
+              chatList: _chatHistory,
               onChatSelected: _selectChat,
               onDeleteChat: _deleteChat,
               onArchiveChat: _archiveChat,

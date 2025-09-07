@@ -10,11 +10,12 @@ class SideNav extends StatefulWidget {
   final bool isExpanded;
   final bool isPinned;
   final VoidCallback onToggle;
-  final List<ChatSession> chatHistory;
+  final List<ChatSession> chatList;
   final Function(ChatSession) onChatSelected;
   final Function(ChatSession) onDeleteChat;
   final Function(ChatSession) onArchiveChat;
   final Function(ChatSession, String) onRenameChat;
+  final ChatSession? selectedChat;
 
   const SideNav({
     super.key,
@@ -22,11 +23,12 @@ class SideNav extends StatefulWidget {
     required this.isExpanded,
     required this.isPinned,
     required this.onToggle,
-    required this.chatHistory,
+    required this.chatList,
     required this.onChatSelected,
     required this.onDeleteChat,
     required this.onArchiveChat,
     required this.onRenameChat,
+    this.selectedChat,
   });
 
   @override
@@ -125,78 +127,17 @@ class _SideNavState extends State<SideNav> {
                     child: Material(
                       type: MaterialType.transparency,
                       child: ListView.builder(
-                        itemCount: widget.chatHistory.length,
+                        itemCount: widget.chatList.length,
                         itemBuilder: (context, index) {
-                          final chat = widget.chatHistory[index];
-                          return MouseRegion(
-                            child: ListTile(
-                              leading: const Icon(
-                                Icons.chat_bubble_outline,
-                                size: 16,
-                              ),
-                              title: Text(chat.title),
-                              onTap: () => widget.onChatSelected(chat),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8.0),
-                              ),
-                              hoverColor: theme.colorScheme.surfaceContainer,
-                              selectedColor:
-                                  theme.colorScheme.surfaceContainerHighest,
-                              horizontalTitleGap: 8,
-                              contentPadding: EdgeInsets.only(
-                                left: 16,
-                                right: 8,
-                              ),
-                              trailing: PopupMenuButton<String>(
-                                offset: Offset(40, 0),
-                                menuPadding: EdgeInsets.zero,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16.0),
-                                ),
-                                clipBehavior: Clip.antiAlias,
-                                onSelected: (value) {
-                                  if (value == 'rename') {
-                                    _showRenameDialog(chat);
-                                  } else if (value == 'archive') {
-                                    widget.onArchiveChat(chat);
-                                  } else if (value == 'delete') {
-                                    widget.onDeleteChat(chat);
-                                  }
-                                },
-                                itemBuilder: (context) => [
-                                  const PopupMenuItem(
-                                    value: 'rename',
-                                    child: Row(
-                                      spacing: 12,
-                                      children: <Widget>[
-                                        Icon(Icons.drive_file_rename_outline),
-                                        Text('Rename'),
-                                      ],
-                                    ),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'archive',
-                                    child: Row(
-                                      spacing: 12,
-                                      children: <Widget>[
-                                        Icon(Icons.archive_outlined),
-                                        Text('Archive'),
-                                      ],
-                                    ),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'delete',
-                                    child: Row(
-                                      spacing: 12,
-                                      children: <Widget>[
-                                        Icon(Icons.delete_outline),
-                                        Text('Delete'),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                          final chat = widget.chatList[index];
+                          final isSelected = widget.selectedChat?.id == chat.id;
+                          return ChatListTile(
+                            chat: chat,
+                            isSelected: isSelected,
+                            onTap: () => widget.onChatSelected(chat),
+                            onRename: () => _showRenameDialog(chat),
+                            onArchive: () => widget.onArchiveChat(chat),
+                            onDelete: () => widget.onDeleteChat(chat),
                           );
                         },
                       ),
@@ -222,6 +163,107 @@ class _SideNavState extends State<SideNav> {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ChatListTile extends StatefulWidget {
+  final ChatSession chat;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final VoidCallback onRename;
+  final VoidCallback onArchive;
+  final VoidCallback onDelete;
+
+  const ChatListTile({
+    super.key,
+    required this.chat,
+    required this.isSelected,
+    required this.onTap,
+    required this.onRename,
+    required this.onArchive,
+    required this.onDelete,
+  });
+
+  @override
+  State<ChatListTile> createState() => _ChatListTileState();
+}
+
+class _ChatListTileState extends State<ChatListTile> {
+  bool _isHovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final showPopupMenu = _isHovering || widget.isSelected;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovering = true),
+      onExit: (_) => setState(() => _isHovering = false),
+      child: ListTile(
+        leading: const Icon(Icons.chat_bubble_outline, size: 16),
+        title: Text(widget.chat.title),
+        onTap: widget.onTap,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
+        hoverColor: theme.colorScheme.onPrimary.withValues(alpha: 0.5),
+        selected: widget.isSelected,
+        selectedTileColor: theme.colorScheme.onPrimary,
+        horizontalTitleGap: 8,
+        contentPadding: const EdgeInsets.only(left: 16, right: 8),
+        trailing: AnimatedOpacity(
+          opacity: showPopupMenu ? 1.0 : 0.0,
+          duration: 200.ms,
+          child: PopupMenuButton<String>(
+            offset: const Offset(40, 0),
+            menuPadding: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.0),
+            ),
+            clipBehavior: Clip.antiAlias,
+            onSelected: (value) {
+              if (value == 'rename') {
+                widget.onRename();
+              } else if (value == 'archive') {
+                widget.onArchive();
+              } else if (value == 'delete') {
+                widget.onDelete();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'rename',
+                child: Row(
+                  spacing: 12,
+                  children: <Widget>[
+                    Icon(Icons.drive_file_rename_outline),
+                    Text('Rename'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'archive',
+                child: Row(
+                  spacing: 12,
+                  children: <Widget>[
+                    Icon(Icons.archive_outlined),
+                    Text('Archive'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  spacing: 12,
+                  children: <Widget>[
+                    Icon(Icons.delete_outline),
+                    Text('Delete'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),

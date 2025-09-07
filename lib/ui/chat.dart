@@ -1,4 +1,5 @@
 import 'package:arcadia/ui/md/highlight.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -114,7 +115,6 @@ class _ChatUIState extends State<ChatUI> {
       revertOptimisticUI();
 
       toastification.show(
-        context: context,
         type: ToastificationType.error,
         style: ToastificationStyle.flatColored,
         title: const Text("Something went wrong"),
@@ -158,43 +158,54 @@ class _ChatUIState extends State<ChatUI> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 900),
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.all(16.0),
-                itemCount: widget.chatSession.messages.length,
-                itemBuilder: (context, index) {
-                  final message = widget.chatSession.messages[index];
-                  final lastUserMessageIndex = widget.chatSession.messages
-                      .lastIndexWhere((m) => m.isUser);
-                  final lastAiMessageIndex = widget.chatSession.messages
-                      .lastIndexWhere((m) => !m.isUser);
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerSignal: (event) {
+        if (event is PointerScrollEvent) {
+          _scrollController.jumpTo(
+            _scrollController.offset + event.scrollDelta.dy,
+          );
+        }
+      },
+      child: Column(
+        children: [
+          Expanded(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 900),
+                child: ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(16.0),
+                  itemCount: widget.chatSession.messages.length,
+                  itemBuilder: (context, index) {
+                    final message = widget.chatSession.messages[index];
+                    final lastUserMessageIndex = widget.chatSession.messages
+                        .lastIndexWhere((m) => m.isUser);
+                    final lastAiMessageIndex = widget.chatSession.messages
+                        .lastIndexWhere((m) => !m.isUser);
 
-                  final bool isLastUserMessage = index == lastUserMessageIndex;
-                  final bool isLastAiMessage = index == lastAiMessageIndex;
+                    final bool isLastUserMessage =
+                        index == lastUserMessageIndex;
+                    final bool isLastAiMessage = index == lastAiMessageIndex;
 
-                  return MessageBubble(
-                    message: message,
-                    isLastUserMessage: isLastUserMessage,
-                    isLastAiMessage: isLastAiMessage,
-                  );
-                },
+                    return MessageBubble(
+                      message: message,
+                      isLastUserMessage: isLastUserMessage,
+                      isLastAiMessage: isLastAiMessage,
+                    );
+                  },
+                ),
               ),
             ),
           ),
-        ),
-        if (_isLoading)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 10.0),
-            child: LinearProgressIndicator(),
-          ),
-        _buildTextInputArea(),
-      ],
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 10.0),
+              child: LinearProgressIndicator(),
+            ),
+          _buildTextInputArea(),
+        ],
+      ),
     );
   }
 

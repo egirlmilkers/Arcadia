@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:uuid/uuid.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'services/model.dart';
 import 'theme/manager.dart';
@@ -13,7 +12,7 @@ import 'ui/main.dart';
 import 'util.dart';
 
 void main() {
-  GoogleFonts.config.allowRuntimeFetching = false;
+  // GoogleFonts.config.allowRuntimeFetching = false;
 
   if (Platform.isWindows) {
     // fixes clipboard history flutter bug
@@ -32,10 +31,7 @@ void main() {
   );
 }
 
-// TODO:
-// - able to scroll from bg
-// - highlight selected chat
-
+// ========== TODO ==========
 // - Attachment display
 // - thinking dropdown
 // - loading spinner (gradient colored)
@@ -43,7 +39,7 @@ void main() {
 // - export chat to JSONL
 // - new chat welcome
 
-// Future updates:
+// ===== Future Updates =====
 // - allow models like chatgpt and deepseek
 // - app icon
 // - pinning chats
@@ -56,8 +52,6 @@ void main() {
 // - action buttons scroll with app bar
 // - selectable syntax themes
 // - table format
-
-// --- DATA MODELS ---
 
 class ChatMessage {
   final String id;
@@ -128,8 +122,6 @@ class ChatSession {
     }
   }
 }
-
-// --- MAIN APP ---
 
 class Arcadia extends StatelessWidget {
   const Arcadia({super.key});
