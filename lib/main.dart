@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:uuid/uuid.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'services/model.dart';
 import 'theme/manager.dart';
@@ -12,6 +13,8 @@ import 'ui/main.dart';
 import 'util.dart';
 
 void main() {
+  GoogleFonts.config.allowRuntimeFetching = false;
+  
   if (Platform.isWindows) {
     // fixes clipboard history flutter bug
     WindowsInjector.instance.injectKeyData();
@@ -30,12 +33,8 @@ void main() {
 }
 
 // TODO:
-// - allow selecting text
 // - able to scroll from bg
-// - remember message state when scrolling back
-// - syntax highlighting
-// - copying fix
-
+// - highlight selected chat
 
 // - Attachment display
 // - thinking dropdown
@@ -45,6 +44,7 @@ void main() {
 // - new chat welcome
 
 // Future updates:
+// - allow models like chatgpt and deepseek
 // - app icon
 // - pinning chats
 // - drag and drop files

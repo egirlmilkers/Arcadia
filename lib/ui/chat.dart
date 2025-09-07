@@ -1,3 +1,4 @@
+import 'package:arcadia/ui/md/highlight.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -12,6 +13,8 @@ import '../main.dart';
 import '../services/chat_history.dart';
 import '../services/gemini.dart';
 import '../theme/manager.dart';
+import '../util.dart';
+import 'md/code_block.dart';
 
 class ChatUI extends StatefulWidget {
   final ChatSession chatSession;
@@ -319,7 +322,8 @@ class MessageBubble extends StatefulWidget {
   State<MessageBubble> createState() => _MessageBubbleState();
 }
 
-class _MessageBubbleState extends State<MessageBubble> {
+class _MessageBubbleState extends State<MessageBubble>
+    with AutomaticKeepAliveClientMixin {
   late final bool _isLongMessage;
   late bool _isExpanded;
   static const int _maxLength = 300;
@@ -334,7 +338,11 @@ class _MessageBubbleState extends State<MessageBubble> {
   }
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     final theme = Theme.of(context);
     final isUser = widget.message.isUser;
 
@@ -403,12 +411,28 @@ class _MessageBubbleState extends State<MessageBubble> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (widget.message.text.isNotEmpty)
-                      GptMarkdown(
-                        messageText,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: isUser
-                              ? theme.colorScheme.onPrimaryContainer
-                              : theme.colorScheme.onSurface,
+                      SelectionArea(
+                        focusNode: FocusNode(),
+                        selectionControls: materialTextSelectionControls,
+                        child: GptMarkdown(
+                          messageText,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: isUser
+                                ? theme.colorScheme.onPrimaryContainer
+                                : theme.colorScheme.onSurface,
+                          ),
+                          codeBuilder: (context, name, code, closed) {
+                            return CodeBlock(
+                              language: name,
+                              code: code,
+                              brightness: Theme.of(context).brightness,
+                            );
+                          },
+                          highlightBuilder: (context, text, style) {
+                            return Highlight(
+                              text: text,
+                            );
+                          },
                         ),
                       ),
                   ],
@@ -446,8 +470,6 @@ class _MessageBubbleState extends State<MessageBubble> {
   Widget _buildActionBar(BuildContext context, bool isUser) {
     final theme = Theme.of(context);
     final onPrimaryContainer = theme.colorScheme.onPrimaryContainer;
-    final tertiaryContainer = theme.colorScheme.tertiaryContainer;
-    final onTertiaryContainer = theme.colorScheme.onTertiaryContainer;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -467,30 +489,7 @@ class _MessageBubbleState extends State<MessageBubble> {
                 message: 'Copy',
                 child: _buildIconButton(context, Icons.copy_all_outlined, () {
                   Clipboard.setData(ClipboardData(text: widget.message.text));
-                  toastification.show(
-                    context: context,
-                    type: ToastificationType.success,
-                    style: ToastificationStyle.simple,
-                    title: const Text("Copied to clipboard!"),
-                    alignment: Alignment.topCenter,
-                    padding: EdgeInsets.only(left: 8, right: 8),
-                    backgroundColor: tertiaryContainer,
-                    foregroundColor: onTertiaryContainer,
-                    autoCloseDuration: const Duration(
-                      seconds: 1,
-                      milliseconds: 300,
-                    ),
-                    animationBuilder: (context, animation, alignment, child) {
-                      return FadeTransition(opacity: animation, child: child);
-                    },
-                    borderRadius: BorderRadius.circular(100.0),
-                    boxShadow: highModeShadow,
-                    closeButton: const ToastCloseButton(
-                      showType: CloseButtonShowType.none,
-                    ),
-                    dragToClose: true,
-                    borderSide: BorderSide(color: Colors.transparent),
-                  );
+                  showCopiedToast(context, theme.colorScheme);
                 }, color: onPrimaryContainer),
               ),
               Tooltip(
@@ -505,30 +504,7 @@ class _MessageBubbleState extends State<MessageBubble> {
                 message: 'Copy',
                 child: _buildIconButton(context, Icons.copy_all_outlined, () {
                   Clipboard.setData(ClipboardData(text: widget.message.text));
-                  toastification.show(
-                    context: context,
-                    type: ToastificationType.success,
-                    style: ToastificationStyle.simple,
-                    title: const Text("Copied to clipboard!"),
-                    alignment: Alignment.topCenter,
-                    padding: EdgeInsets.only(left: 8, right: 8),
-                    backgroundColor: tertiaryContainer,
-                    foregroundColor: onTertiaryContainer,
-                    autoCloseDuration: const Duration(
-                      seconds: 1,
-                      milliseconds: 300,
-                    ),
-                    animationBuilder: (context, animation, alignment, child) {
-                      return FadeTransition(opacity: animation, child: child);
-                    },
-                    borderRadius: BorderRadius.circular(100.0),
-                    boxShadow: highModeShadow,
-                    closeButton: const ToastCloseButton(
-                      showType: CloseButtonShowType.none,
-                    ),
-                    dragToClose: true,
-                    borderSide: BorderSide(color: Colors.transparent),
-                  );
+                  showCopiedToast(context, theme.colorScheme);
                 }),
               ),
               Tooltip(

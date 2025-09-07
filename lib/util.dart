@@ -1,5 +1,9 @@
 import 'dart:ui';
 
+import 'package:flutter/material.dart';
+
+import 'package:toastification/toastification.dart';
+
 extension StringExtension on String {
   String capitalize() {
     if (isEmpty) return this;
@@ -97,4 +101,26 @@ class WindowsInjector {
       return callback(data);
     };
   }
+}
+
+ToastificationItem showCopiedToast(BuildContext context, ColorScheme theme) {
+  return toastification.show(
+    context: context,
+    type: ToastificationType.success,
+    style: ToastificationStyle.simple,
+    title: const Text("Copied to clipboard!"),
+    alignment: Alignment.topCenter,
+    padding: EdgeInsets.only(left: 8, right: 8),
+    backgroundColor: theme.tertiaryContainer,
+    foregroundColor: theme.onTertiaryContainer,
+    autoCloseDuration: const Duration(seconds: 1, milliseconds: 300),
+    animationBuilder: (context, animation, alignment, child) {
+      return FadeTransition(opacity: animation, child: child);
+    },
+    borderRadius: BorderRadius.circular(100.0),
+    boxShadow: highModeShadow,
+    closeButton: const ToastCloseButton(showType: CloseButtonShowType.none),
+    dragToClose: true,
+    borderSide: BorderSide(color: Colors.transparent),
+  );
 }
