@@ -7,11 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'themes.dart';
 
-enum ContrastLevel { 
-  standard, 
-  medium, 
-  high
-}
+enum ContrastLevel { standard, medium, high }
 
 class ThemeManager extends ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.system;
@@ -42,7 +38,7 @@ class ThemeManager extends ChangeNotifier {
     if (_themes.isEmpty) return null;
     return _themes.firstWhere(
       (t) => t.name == _selectedTheme,
-      orElse: () => _themes.first
+      orElse: () => _themes.first,
     );
   }
 
@@ -57,7 +53,9 @@ class ThemeManager extends ChangeNotifier {
   Future<void> _loadThemes() async {
     try {
       final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
-      final assets = manifest.listAssets().where((path) => path.startsWith('assets/themes/'));
+      final assets = manifest.listAssets().where(
+        (path) => path.startsWith('assets/themes/'),
+      );
 
       final List<AppTheme> loadedThemes = [];
       for (final path in assets) {
@@ -66,17 +64,20 @@ class ThemeManager extends ChangeNotifier {
         loadedThemes.add(AppTheme.fromJson(themeJson));
       }
       _themes = loadedThemes;
-    }
-    catch (e) {
+    } catch (e) {
       debugPrint('Error loading themes:\n$e');
     }
   }
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    _themeMode = ThemeMode.values[prefs.getInt('themeMode') ?? ThemeMode.system.index];
-    _selectedTheme = prefs.getString('selectedTheme') ?? (_themes.isNotEmpty ? _themes.first.name : 'Gemini');
-    _contrastLevel = ContrastLevel.values[prefs.getInt('contrastLevel') ?? ContrastLevel.standard.index];
+    _themeMode =
+        ThemeMode.values[prefs.getInt('themeMode') ?? ThemeMode.system.index];
+    _selectedTheme =
+        prefs.getString('selectedTheme') ??
+        (_themes.isNotEmpty ? _themes.first.name : 'Gemini');
+    _contrastLevel = ContrastLevel
+        .values[prefs.getInt('contrastLevel') ?? ContrastLevel.standard.index];
     _useDynamicColor = prefs.getBool('useDynamicColor') ?? false;
   }
 
@@ -129,24 +130,34 @@ class ThemeManager extends ChangeNotifier {
     if (useDynamicColor && scheme != null) {
       return _getThemeData(scheme);
     }
-    
+
     final selected = currentTheme;
     if (selected == null) {
       // Safe fallback if no themes are loaded
-      return ThemeData(brightness: brightness, useMaterial3: true, fontFamily: 'GoogleSans'); 
+      return ThemeData(
+        brightness: brightness,
+        useMaterial3: true,
+        fontFamily: 'GoogleSans',
+      );
     }
 
     if (brightness == Brightness.dark) {
       switch (_contrastLevel) {
-        case ContrastLevel.standard: return _getThemeData(selected.dark);
-        case ContrastLevel.medium: return _getThemeData(selected.darkMediumContrast);
-        case ContrastLevel.high: return _getThemeData(selected.darkHighContrast);
+        case ContrastLevel.standard:
+          return _getThemeData(selected.dark);
+        case ContrastLevel.medium:
+          return _getThemeData(selected.darkMediumContrast);
+        case ContrastLevel.high:
+          return _getThemeData(selected.darkHighContrast);
       }
     } else {
       switch (_contrastLevel) {
-        case ContrastLevel.standard: return _getThemeData(selected.light);
-        case ContrastLevel.medium: return _getThemeData(selected.lightMediumContrast);
-        case ContrastLevel.high: return _getThemeData(selected.lightHighContrast);
+        case ContrastLevel.standard:
+          return _getThemeData(selected.light);
+        case ContrastLevel.medium:
+          return _getThemeData(selected.lightMediumContrast);
+        case ContrastLevel.high:
+          return _getThemeData(selected.lightHighContrast);
       }
     }
   }

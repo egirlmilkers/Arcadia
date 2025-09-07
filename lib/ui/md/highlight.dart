@@ -8,6 +8,7 @@ class Highlight extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      transform: Matrix4.translationValues(0, -2, 0),
       padding: EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
         color: Colors.grey[850],
@@ -15,10 +16,7 @@ class Highlight extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: TextStyle(
-          fontFamily: 'GoogleSansCode',
-          color: Colors.grey[200],
-        ),
+        style: TextStyle(fontFamily: 'GoogleSansCode', color: Colors.grey[200]),
       ),
     );
   }

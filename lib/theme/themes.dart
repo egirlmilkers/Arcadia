@@ -9,7 +9,6 @@ Color _colorFromHex(String hex) {
   return Color(int.parse(buffer.toString(), radix: 16));
 }
 
-
 class AppTheme {
   final String name;
   final List<Color> gradientColors;
@@ -34,7 +33,10 @@ class AppTheme {
   // Create an AppTheme from JSON
   factory AppTheme.fromJson(Map<String, dynamic> json) {
     // Helper for parsing a ColorScheme from JSON
-    ColorScheme colorSchemeFromJson(Map<String, dynamic> schemeJson, bool light) {
+    ColorScheme colorSchemeFromJson(
+      Map<String, dynamic> schemeJson,
+      bool light,
+    ) {
       return ColorScheme(
         brightness: light ? Brightness.light : Brightness.dark,
         primary: _colorFromHex(schemeJson['primary']),
@@ -66,31 +68,43 @@ class AppTheme {
         primaryFixed: _colorFromHex(schemeJson['primaryFixed']),
         onPrimaryFixed: _colorFromHex(schemeJson['onPrimaryFixed']),
         primaryFixedDim: _colorFromHex(schemeJson['primaryFixedDim']),
-        onPrimaryFixedVariant: _colorFromHex(schemeJson['onPrimaryFixedVariant']),
+        onPrimaryFixedVariant: _colorFromHex(
+          schemeJson['onPrimaryFixedVariant'],
+        ),
         secondaryFixed: _colorFromHex(schemeJson['secondaryFixed']),
         onSecondaryFixed: _colorFromHex(schemeJson['onSecondaryFixed']),
         secondaryFixedDim: _colorFromHex(schemeJson['secondaryFixedDim']),
-        onSecondaryFixedVariant: _colorFromHex(schemeJson['onSecondaryFixedVariant']),
+        onSecondaryFixedVariant: _colorFromHex(
+          schemeJson['onSecondaryFixedVariant'],
+        ),
         tertiaryFixed: _colorFromHex(schemeJson['tertiaryFixed']),
         onTertiaryFixed: _colorFromHex(schemeJson['onTertiaryFixed']),
         tertiaryFixedDim: _colorFromHex(schemeJson['tertiaryFixedDim']),
-        onTertiaryFixedVariant: _colorFromHex(schemeJson['onTertiaryFixedVariant']),
+        onTertiaryFixedVariant: _colorFromHex(
+          schemeJson['onTertiaryFixedVariant'],
+        ),
         surfaceDim: _colorFromHex(schemeJson['surfaceDim']),
         surfaceBright: _colorFromHex(schemeJson['surfaceBright']),
-        surfaceContainerLowest: _colorFromHex(schemeJson['surfaceContainerLowest']),
+        surfaceContainerLowest: _colorFromHex(
+          schemeJson['surfaceContainerLowest'],
+        ),
         surfaceContainerLow: _colorFromHex(schemeJson['surfaceContainerLow']),
         surfaceContainer: _colorFromHex(schemeJson['surfaceContainer']),
         surfaceContainerHigh: _colorFromHex(schemeJson['surfaceContainerHigh']),
-        surfaceContainerHighest: _colorFromHex(schemeJson['surfaceContainerHighest'])
+        surfaceContainerHighest: _colorFromHex(
+          schemeJson['surfaceContainerHighest'],
+        ),
       );
     }
 
     final schemes = json['schemes'] as Map<String, dynamic>;
-    
+
     // Parse gradient colors, with a fallback
-    final List<Color> gradient = (json['gradientColors'] as List<dynamic>?)
-        ?.map((hex) => _colorFromHex(hex as String))
-        .toList() ?? [ const Color(0xFF4285F4), const Color(0xFF9B72CB) ];
+    final List<Color> gradient =
+        (json['gradientColors'] as List<dynamic>?)
+            ?.map((hex) => _colorFromHex(hex as String))
+            .toList() ??
+        [const Color(0xFF4285F4), const Color(0xFF9B72CB)];
 
     // --- FIX: Robustly handle potentially empty or missing contrast schemes ---
     // 1. Define base schemes
@@ -100,7 +114,7 @@ class AppTheme {
     // 2. Create merged schemes that start with the base and add any contrast-specific overrides
     final lightMediumContrast = Map<String, dynamic>.from(lightBase)
       ..addAll(schemes['light-medium-contrast'] as Map<String, dynamic>? ?? {});
-    
+
     final lightHighContrast = Map<String, dynamic>.from(lightBase)
       ..addAll(schemes['light-high-contrast'] as Map<String, dynamic>? ?? {});
 

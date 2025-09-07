@@ -14,7 +14,7 @@ import 'util.dart';
 
 void main() {
   GoogleFonts.config.allowRuntimeFetching = false;
-  
+
   if (Platform.isWindows) {
     // fixes clipboard history flutter bug
     WindowsInjector.instance.injectKeyData();
@@ -54,6 +54,8 @@ void main() {
 // - personalized starter prompt
 // - streaming output + thinking dropdown
 // - action buttons scroll with app bar
+// - selectable syntax themes
+// - table format
 
 // --- DATA MODELS ---
 

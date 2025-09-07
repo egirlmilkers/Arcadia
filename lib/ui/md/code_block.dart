@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:flutter_highlight/flutter_highlight.dart';
-import 'package:flutter_highlight/themes/atom-one-dark.dart';
-import 'package:flutter_highlight/themes/atom-one-light.dart';
-
+import '../../syntax/syntax_view.dart';
+import '../../syntax/themes.dart';
 import '../../util.dart';
 
 class CodeBlock extends StatelessWidget {
@@ -22,9 +20,11 @@ class CodeBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appTheme = Theme.of(context);
-    final Map<String, TextStyle> theme = (brightness == Brightness.dark
-        ? atomOneDarkTheme
-        : atomOneLightTheme);
+    final Map<String, TextStyle> theme =
+        (brightness == Brightness.dark
+            ? themes['atom-one-dark']
+            : themes['atom-one-light']) ??
+        const {}; // should never reach this
 
     return Container(
       margin: EdgeInsets.only(bottom: 16),
@@ -55,7 +55,7 @@ class CodeBlock extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    language == '' ? 'plain text' : language,
+                    language == '' ? 'plaintext' : language,
                     style: TextStyle(
                       fontFamily: 'GoogleSansCode',
                       fontVariations: <FontVariation>[
@@ -96,7 +96,7 @@ class CodeBlock extends StatelessWidget {
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(6),
                   ),
-                  child: HighlightView(
+                  child: SyntaxView(
                     cleanCode(code),
                     language: language,
                     theme: theme,

@@ -429,9 +429,7 @@ class _MessageBubbleState extends State<MessageBubble>
                             );
                           },
                           highlightBuilder: (context, text, style) {
-                            return Highlight(
-                              text: text,
-                            );
+                            return Highlight(text: text);
                           },
                         ),
                       ),
