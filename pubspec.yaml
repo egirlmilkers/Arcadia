@@ -1,7 +1,7 @@
 name: arcadia
 description: A Flutter clone of the Gemini UI.
 publish_to: 'none'
-version: 1.0.0+14
+version: 1.0.0+15
 
 
 environment:
@@ -41,6 +41,12 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+
+dependency_overrides:
+  characters: 1.4.1
+  material_color_utilities: 0.13.0
+  meta: 1.17.0
+  test_api: 0.7.7
 
 
 flutter:

@@ -30,17 +30,30 @@ void main() {
 }
 
 // TODO:
+// - allow selecting text
+// - able to scroll from bg
+// - remember message state when scrolling back
+// - syntax highlighting
+// - copying fix
+
+
 // - Attachment display
 // - thinking dropdown
-// - loading spinner
-// - able to scroll from bg
+// - loading spinner (gradient colored)
+// - action buttons
+// - export chat to JSONL
+// - new chat welcome
 
 // Future updates:
+// - app icon
 // - pinning chats
 // - drag and drop files
 // - view archived chats
 // - ai generated chat names
 // - logs with every ui element interaction logged
+// - personalized starter prompt
+// - streaming output + thinking dropdown
+// - action buttons scroll with app bar
 
 // --- DATA MODELS ---
 
