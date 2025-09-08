@@ -34,7 +34,7 @@ class WelcomeUI extends StatelessWidget {
                     "Hello, there",
                     style: TextStyle(
                       fontSize: 56,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
                       color: Colors.white,
                     ),
                   ),

@@ -17,6 +17,7 @@ import '../services/chat_history.dart';
 import '../services/gemini.dart';
 import '../theme/manager.dart';
 import '../util.dart';
+import 'widgets/thinking_spinner.dart';
 
 class ChatUI extends StatefulWidget {
   final ChatSession chatSession;
@@ -226,16 +227,11 @@ class _ChatUIState extends State<ChatUI> {
                         },
                         separatorBuilder: (context, index) {
                           return const SizedBox(height: 20);
-                        }
+                        },
                       ),
                     ),
                   ),
           ),
-          if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 10.0),
-              child: LinearProgressIndicator(),
-            ),
           _buildTextInputArea(),
         ],
       ),
@@ -305,8 +301,10 @@ class _ChatUIState extends State<ChatUI> {
                 },
                 child: TextField(
                   controller: _textController,
+                  readOnly: _isLoading,
                   decoration: InputDecoration(
-                    hintText: 'Ask $themeName',
+                    hintText: _isLoading ? null : 'Ask $themeName',
+                    hint: _isLoading ? const ThinkingSpinner() : null,
                     filled: true,
                     fillColor: theme.colorScheme.surfaceContainer,
                     border: OutlineInputBorder(

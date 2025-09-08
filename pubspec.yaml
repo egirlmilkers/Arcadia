@@ -1,7 +1,7 @@
 name: arcadia
 description: A Flutter clone of the Gemini UI.
 publish_to: 'none'
-version: 1.0.0+19
+version: 1.0.0+20
 
 
 environment:
@@ -58,7 +58,7 @@ flutter:
     - assets/models.json
 
   fonts:
-    - family: GoogleSans
+    - family: GoogleSans # Flex
       fonts:
         - asset: assets/fonts/GoogleSans-Regular.ttf
         - asset: assets/fonts/GoogleSans-Italic.ttf
@@ -72,7 +72,9 @@ flutter:
           weight: 500
         - asset: assets/fonts/GoogleSans-MediumItalic.ttf
           weight: 500
-          style: italic
+        # - asset: assets/fonts/GoogleSansFlex-VariableFont_wght.ttf
+        # - asset: assets/fonts/GoogleSansFlex-Italic-VariableFont_wght.ttf
+        #   style: italic
     - family: GoogleSansCode
       fonts:
         - asset: assets/fonts/GoogleSansCode-VariableFont_wght.ttf

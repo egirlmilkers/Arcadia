@@ -6,12 +6,13 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'themes.dart';
+import '../ui/widgets/thinking_spinner.dart';
 
 enum ContrastLevel { standard, medium, high }
 
 class ThemeManager extends ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.system;
-  String _selectedTheme = 'Gemini';
+  String _selectedTheme = 'Arcadia';
   ContrastLevel _contrastLevel = ContrastLevel.standard;
   bool _useDynamicColor = false;
   bool dynamicColorAvailable = false;
@@ -118,10 +119,16 @@ class ThemeManager extends ChangeNotifier {
 
   // methods
   ThemeData _getThemeData(ColorScheme scheme) {
+    final theme = currentTheme;
+    final gradientColors =
+        theme?.gradientColors ??
+        [scheme.primary, scheme.secondary, scheme.tertiary];
+
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
       fontFamily: 'GoogleSans',
+      extensions: [ThemeGradient(gradientColors: gradientColors)],
     );
   }
 

@@ -58,8 +58,8 @@ class CodeBlock extends StatelessWidget {
                     language == '' ? 'plaintext' : language,
                     style: TextStyle(
                       fontFamily: 'GoogleSansCode',
-                      fontVariations: <FontVariation>[
-                        FontVariation('wght', 700),
+                      fontVariations: const [
+                        FontVariation('wght', 700.0)
                       ],
                       color: theme['root']?.color?.withValues(alpha: 0.7),
                     ),
@@ -108,8 +108,8 @@ class CodeBlock extends StatelessWidget {
                     ),
                     textStyle: TextStyle(
                       fontFamily: 'GoogleSansCode',
-                      fontVariations: <FontVariation>[
-                        FontVariation('wght', 400),
+                      fontVariations: const [
+                        FontVariation('wght', 400.0)
                       ],
                     ),
                   ),

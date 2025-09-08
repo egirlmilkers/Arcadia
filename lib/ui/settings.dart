@@ -201,7 +201,10 @@ class _SettingsPageState extends State<SettingsPage> {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Settings'),
+            title: const Text(
+              'Settings',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
             backgroundColor: Theme.of(
               context,
             ).colorScheme.surfaceContainerLowest,
@@ -318,11 +321,10 @@ class SettingsHeader extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Text(
-        title.toUpperCase(),
+        title,
         style: TextStyle(
           color: Theme.of(context).colorScheme.primary,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.1,
+          fontWeight: FontWeight.w900,
         ),
       ),
     );
@@ -346,8 +348,13 @@ class SettingsListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      title: Text(title),
-      subtitle: Text(subtitle),
+      title: Text(
+        title,
+        style: TextStyle(fontWeight: FontWeight.w500),
+      ),
+      subtitle: Text(subtitle,
+        style: TextStyle(fontWeight: FontWeight.w300),
+      ),
       onTap: onTap,
       enabled: enabled,
     );

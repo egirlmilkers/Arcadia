@@ -108,3 +108,6 @@ windows/cmake-build-*/
 
 # Coverage
 coverage/
+
+# unused fonts
+assets/fonts/GoogleSansFlex*.ttf

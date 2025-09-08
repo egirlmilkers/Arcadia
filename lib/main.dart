@@ -34,21 +34,22 @@ void main() {
 // ========== TODO ==========
 // - Attachment display
 // - thinking dropdown
-// - loading spinner (gradient colored)
 // - action buttons
 // - export chat to JSONL
-// - new chat welcome
+// - sort chats by last modified
+
+// - github autobuild
 
 // ===== Future Updates =====
+// - android version
 // - allow models like chatgpt and deepseek
 // - app icon
 // - pinning chats
 // - drag and drop files
 // - view archived chats
-// - ai generated chat names
 // - logs with every ui element interaction logged
 // - personalized starter prompt
-// - streaming output + thinking dropdown
+// - streaming output & thinking
 // - action buttons scroll with app bar
 // - selectable syntax themes
 // - table format

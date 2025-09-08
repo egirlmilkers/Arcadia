@@ -116,13 +116,12 @@ class _SideNavState extends State<SideNav> {
                   backgroundColor: theme.colorScheme.primaryContainer,
                   foregroundColor: theme.colorScheme.onPrimaryContainer,
                 ),
-                const SizedBox(height: 24),
-                if (widget.isExpanded)
+                if (widget.isExpanded) ...[
+                  const SizedBox(height: 20),
                   Padding(
-                    padding: const EdgeInsets.only(left: 8.0, bottom: 8),
-                    child: Text("Recent", style: theme.textTheme.titleSmall),
+                    padding: const EdgeInsets.only(left: 8.0, bottom: 4),
+                    child: Text("Recent", style: theme.textTheme.titleMedium),
                   ),
-                if (widget.isExpanded)
                   Expanded(
                     child: Material(
                       type: MaterialType.transparency,
@@ -141,11 +140,14 @@ class _SideNavState extends State<SideNav> {
                           );
                         },
                         separatorBuilder: (context, index) {
-                          return const SizedBox(height: 6);
-                        }
+                          return const SizedBox(height: 4);
+                        },
                       ),
                     ),
                   ),
+                ] else ...[
+                  const Spacer(),
+                ],
                 Container(
                   margin: const EdgeInsets.symmetric(vertical: 8.0),
                   height: 1,
@@ -163,6 +165,7 @@ class _SideNavState extends State<SideNav> {
                   },
                   icon: Icons.settings,
                   label: "Settings",
+                  foregroundColor: theme.textTheme.titleSmall!.color,
                 ),
               ],
             ),
@@ -203,15 +206,23 @@ class _ChatListTileState extends State<ChatListTile> {
     final theme = Theme.of(context);
     final showPopupMenu = _isHovering || widget.isSelected;
 
+    final Color? bgColor = widget.isSelected
+        ? theme.colorScheme.onPrimary
+        : null;
+    final Color? fgColor = widget.isSelected ? theme.colorScheme.primary : null;
+
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovering = true),
       onExit: (_) => setState(() => _isHovering = false),
       child: ListTile(
-        leading: const Icon(Icons.chat_bubble_outline, size: 16),
-        title: Text(widget.chat.title),
+        leading: const Icon(Icons.chat_bubble_rounded, size: 18),
+        title: Text(
+          widget.chat.title,
+          style: TextStyle(fontVariations: [FontVariation('wght', 500.0)]),
+        ),
         onTap: widget.onTap,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
-        hoverColor: theme.colorScheme.onPrimary.withValues(alpha: 0.5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        hoverColor: theme.colorScheme.primary.withValues(alpha: 0.1),
         selected: widget.isSelected,
         selectedTileColor: theme.colorScheme.onPrimary,
         horizontalTitleGap: 8,
@@ -226,6 +237,7 @@ class _ChatListTileState extends State<ChatListTile> {
               borderRadius: BorderRadius.circular(16.0),
             ),
             clipBehavior: Clip.antiAlias,
+            color: bgColor,
             onSelected: (value) {
               if (value == 'rename') {
                 widget.onRename();
@@ -236,33 +248,33 @@ class _ChatListTileState extends State<ChatListTile> {
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'rename',
                 child: Row(
                   spacing: 12,
                   children: <Widget>[
                     Icon(Icons.drive_file_rename_outline),
-                    Text('Rename'),
+                    Text('Rename', style: TextStyle(color: fgColor)),
                   ],
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'archive',
                 child: Row(
                   spacing: 12,
                   children: <Widget>[
                     Icon(Icons.archive_outlined),
-                    Text('Archive'),
+                    Text('Archive', style: TextStyle(color: fgColor)),
                   ],
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'delete',
                 child: Row(
                   spacing: 12,
                   children: <Widget>[
                     Icon(Icons.delete_outline),
-                    Text('Delete'),
+                    Text('Delete', style: TextStyle(color: fgColor)),
                   ],
                 ),
               ),
@@ -308,7 +320,13 @@ class CustomNavButton extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon),
-          if (isExpanded) ...[const SizedBox(width: 8), Text(label)],
+          if (isExpanded) ...[
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(fontVariations: [FontVariation('wght', 550.0)]),
+            ),
+          ],
         ],
       ),
     );

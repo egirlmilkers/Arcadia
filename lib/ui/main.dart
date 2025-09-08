@@ -162,7 +162,7 @@ class _MainUIState extends State<MainUI> {
                       themeManager.selectedTheme,
                       style: TextStyle(
                         fontSize: 24,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w500,
                         color: Colors.white,
                       ),
                     ),
