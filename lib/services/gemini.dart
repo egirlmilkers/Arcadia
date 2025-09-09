@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:mime/mime.dart';
+
 import '../main.dart';
 
 void _generateContentIsolate(Map<String, dynamic> params) async {
@@ -68,14 +70,36 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
     history = history.sublist(firstUserIndex);
 
     final body = {
-      'contents': history.map((message) {
-        return {
-          'role': message.isUser ? 'user' : 'model',
-          'parts': [
-            {'text': message.text},
-          ],
-        };
-      }).toList(),
+      'contents': await Future.wait(
+        history.map((message) async {
+          final parts = <Map<String, dynamic>>[];
+          parts.add({'text': message.text});
+
+          if (message.attachments.isNotEmpty) {
+            for (final attachmentPath in message.attachments) {
+              try {
+                final file = File(attachmentPath);
+                final mimeType = lookupMimeType(attachmentPath);
+                if (mimeType != null) {
+                  final bytes = await file.readAsBytes();
+                  final base64String = base64Encode(bytes);
+                  parts.add({
+                    'inlineData': {'mimeType': mimeType, 'data': base64String},
+                  });
+                }
+              } catch (e) {
+                // Can't really do anything here, just print and continue
+                print('Error processing attachment: $e');
+              }
+            }
+          }
+
+          return {'role': message.isUser ? 'user' : 'model', 'parts': parts};
+        }),
+      ),
+      "generationConfig": {
+        "thinkingConfig": {"thinkingBudget": -1, "includeThoughts": true},
+      },
     };
 
     client!.badCertificateCallback =
@@ -102,9 +126,24 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
           jsonResponse['candidates'][0]['content'] != null &&
           jsonResponse['candidates'][0]['content']['parts'] != null &&
           jsonResponse['candidates'][0]['content']['parts'].isNotEmpty) {
-        mainSendPort.send(
-          jsonResponse['candidates'][0]['content']['parts'][0]['text'],
-        );
+        
+        final List<dynamic> parts = jsonResponse['candidates'][0]['content']['parts'];
+        String thoughtSummary = '';
+        String finalAnswer = '';
+
+        for (final part in parts) {
+          // The documentation uses a 'thought' boolean field to distinguish parts.
+          if (part['thought'] == true) {
+            thoughtSummary += part['text'];
+          } else {
+            finalAnswer += part['text'];
+          }
+        }
+
+        mainSendPort.send({
+          'text': finalAnswer,
+          'thinkingProcess': thoughtSummary,
+        });
       } else {
         mainSendPort.send('Error: Invalid response structure from API.');
       }
@@ -132,11 +171,11 @@ class GeminiService {
 
   GeminiService({required this.apiKey});
 
-  Future<String> generateContent(
+  Future<Map<String, dynamic>> generateContent(
     List<ChatMessage> messages,
     String model,
   ) async {
-    final completer = Completer<String>();
+    final completer = Completer<Map<String, dynamic>>();
     final receivePort = ReceivePort();
 
     final messagesAsJson = messages.map((m) => m.toJson()).toList();
@@ -152,7 +191,14 @@ class GeminiService {
       if (data is SendPort) {
         _sendPort = data;
       } else if (data is String) {
-        completer.complete(data);
+        // Handle error case
+        completer.complete({'error': data});
+        receivePort.close();
+        _isolate?.kill();
+        _isolate = null;
+        _sendPort = null;
+      } else if (data is Map) {
+        completer.complete(Map<String, dynamic>.from(data));
         receivePort.close();
         _isolate?.kill();
         _isolate = null;

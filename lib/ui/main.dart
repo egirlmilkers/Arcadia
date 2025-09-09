@@ -178,6 +178,7 @@ class _MainUIState extends State<MainUI> {
             duration: 200.ms,
             padding: EdgeInsets.only(left: _isPinned ? 280 : 74),
             child: Scaffold(
+              backgroundColor: Colors.transparent,
               appBar: AppBar(
                 backgroundColor: Colors.transparent,
                 elevation: 0,

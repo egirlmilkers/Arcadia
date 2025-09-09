@@ -115,7 +115,7 @@ class _ChatUIState extends State<ChatUI> {
       final contentService = GeminiService(apiKey: apiKey);
       _geminiService = contentService;
 
-      String modelResponse;
+      Map<String, dynamic> modelResponse;
       if (isNewChat) {
         final prompt =
             'Generate a short, concise title (5 words max) for an ai chat started with this user query:\n\n$originalMessage';
@@ -129,12 +129,14 @@ class _ChatUIState extends State<ChatUI> {
         );
 
         final results = await Future.wait([titleFuture, contentFuture]);
-        final newTitle = results[0];
+        final newTitleResponse = results[0];
         modelResponse = results[1];
 
-        if (!newTitle.startsWith('Error:')) {
+        if (newTitleResponse['error'] == null) {
           setState(() {
-            widget.chatSession.title = newTitle.replaceAll('"', '').trim();
+            widget.chatSession.title = newTitleResponse['text']
+                .replaceAll('"', '')
+                .trim();
           });
         }
       } else {
@@ -145,7 +147,7 @@ class _ChatUIState extends State<ChatUI> {
       }
 
       // 1. Check for cancellation first.
-      if (modelResponse == GeminiService.cancelledResponse) {
+      if (modelResponse['text'] == GeminiService.cancelledResponse) {
         // Treat user cancellation not as an error.
         // Clean up the UI and exit gracefully.
         revertOptimisticUI();
@@ -153,15 +155,19 @@ class _ChatUIState extends State<ChatUI> {
       }
 
       // 2. Check for actual errors from the API.
-      if (modelResponse.startsWith('Error:')) {
+      if (modelResponse['error'] != null) {
         // This is a real error. Throw an exception to be caught below.
-        throw Exception(modelResponse);
+        throw Exception(modelResponse['error']);
       }
 
       // 3. If neither of the above, it's a success.
       setState(() {
         widget.chatSession.messages.add(
-          ChatMessage(text: modelResponse, isUser: false),
+          ChatMessage(
+            text: modelResponse['text'],
+            isUser: false,
+            thinkingProcess: modelResponse['thinkingProcess'],
+          ),
         );
       });
       _scrollToBottom();
@@ -244,17 +250,21 @@ class _ChatUIState extends State<ChatUI> {
         widget.selectedModel,
       );
 
-      if (modelResponse == GeminiService.cancelledResponse) {
+      if (modelResponse['text'] == GeminiService.cancelledResponse) {
         return; // User cancelled
       }
 
-      if (modelResponse.startsWith('Error:')) {
-        throw Exception(modelResponse);
+      if (modelResponse['error'] != null) {
+        throw Exception(modelResponse['error']);
       }
 
       setState(() {
         widget.chatSession.messages.add(
-          ChatMessage(text: modelResponse, isUser: false),
+          ChatMessage(
+            text: modelResponse['text'],
+            isUser: false,
+            thinkingProcess: modelResponse['thinkingProcess'],
+          ),
         );
       });
       _scrollToBottom();
@@ -382,7 +392,12 @@ class _ChatUIState extends State<ChatUI> {
           ),
 
         Container(
-          padding: EdgeInsets.only(bottom: 8, left: 4, right: 4, top: _attachments.isNotEmpty ? 0 : 8),
+          padding: EdgeInsets.only(
+            bottom: 8,
+            left: 4,
+            right: 4,
+            top: _attachments.isNotEmpty ? 0 : 8,
+          ),
           child: SafeArea(
             top: false, // SafeArea is only needed for the bottom.
             child: Row(
@@ -688,7 +703,9 @@ class _MessageBubbleState extends State<MessageBubble>
       child: Align(
         alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
         child: Column(
-          crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment: isUser
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
           children: [
             if (widget.message.attachments.isNotEmpty)
               AttachmentView(attachments: widget.message.attachments),
@@ -745,8 +762,11 @@ class _MessageBubbleState extends State<MessageBubble>
                   ],
                   Flexible(
                     child: Column(
+                      spacing: 8,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        if (!isUser && widget.message.thinkingProcess != null)
+                          _buildThinkingProcess(context),
                         SelectionArea(
                           //focusNode: FocusNode(),
                           selectionControls: materialTextSelectionControls,
@@ -804,6 +824,40 @@ class _MessageBubbleState extends State<MessageBubble>
     }
 
     return messageWidget;
+  }
+
+  Widget _buildThinkingProcess(BuildContext context) {
+    final theme = Theme.of(context);
+    return Theme(
+      data: theme.copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        backgroundColor: theme.colorScheme.surfaceContainerHigh,
+        tilePadding: EdgeInsets.symmetric(horizontal: 10),
+        childrenPadding: EdgeInsets.all(10),
+        title: Text(
+          'Thinking Summary',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        children: [
+          GptMarkdown(
+            widget.message.thinkingProcess!,
+            style: theme.textTheme.bodyLarge?.copyWith(),
+            codeBuilder: (context, name, code, closed) {
+              return CodeBlock(
+                language: name,
+                code: code,
+                brightness: Theme.of(context).brightness,
+              );
+            },
+            highlightBuilder: (context, text, style) {
+              return Highlight(text: text);
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildActionBar(BuildContext context, bool isUser) {

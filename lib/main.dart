@@ -33,8 +33,8 @@ void main() {
 
 // ========== TODO ==========
 // - thinking dropdown
-// - scroll issue with codeblock
 // - chats sometimes not loading
+// - transparency doesnt work
 
 // - problems (print)
 // - comments and spacing
@@ -59,6 +59,7 @@ void main() {
 // - thought for x seconds
 // - split widgets
 // - warning popups with (dont ask again) remembering
+// - allow all files attachment
 
 class ChatMessage {
   final String id;
@@ -66,11 +67,13 @@ class ChatMessage {
   final bool isUser;
   final List<String> attachments;
   final DateTime createdAt;
+  final String? thinkingProcess;
 
   ChatMessage({
     required this.text,
     required this.isUser,
     this.attachments = const [],
+    this.thinkingProcess,
     String? id,
     DateTime? createdAt,
   }) : id = id ?? const Uuid().v4(),
@@ -83,6 +86,7 @@ class ChatMessage {
       isUser: json['isUser'],
       attachments: List<String>.from(json['attachments']),
       createdAt: DateTime.parse(json['createdAt']),
+      thinkingProcess: json['thinkingProcess'],
     );
   }
 
@@ -93,6 +97,7 @@ class ChatMessage {
       'isUser': isUser,
       'attachments': attachments,
       'createdAt': createdAt.toIso8601String(),
+      'thinkingProcess': thinkingProcess,
     };
   }
 }
