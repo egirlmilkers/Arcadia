@@ -184,18 +184,20 @@ class _ChatUIState extends State<ChatUI> {
 
   @override
   Widget build(BuildContext context) {
-    return Listener(
-      behavior: HitTestBehavior.opaque,
-      onPointerSignal: (event) {
-        if (event is PointerScrollEvent) {
-          _scrollController.jumpTo(
-            _scrollController.offset + event.scrollDelta.dy,
-          );
-        }
-      },
-      child: Column(
-        children: [
-          Expanded(
+    return Column(
+      children: [
+        Expanded(
+          child: Listener(
+            behavior: HitTestBehavior.opaque,
+            onPointerSignal: (event) {
+              if (event is PointerScrollEvent) {
+                if (_scrollController.hasClients) {
+                  _scrollController.jumpTo(
+                    _scrollController.offset + event.scrollDelta.dy,
+                  );
+                }
+              }
+            },
             child: widget.chatSession.messages.isEmpty
                 ? const WelcomeUI()
                 : Center(
@@ -232,9 +234,9 @@ class _ChatUIState extends State<ChatUI> {
                     ),
                   ),
           ),
-          _buildTextInputArea(),
-        ],
-      ),
+        ),
+        _buildTextInputArea(),
+      ],
     );
   }
 

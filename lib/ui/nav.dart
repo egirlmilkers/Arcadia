@@ -15,6 +15,7 @@ class SideNav extends StatefulWidget {
   final Function(ChatSession) onDeleteChat;
   final Function(ChatSession) onArchiveChat;
   final Function(ChatSession, String) onRenameChat;
+  final Function(ChatSession) onExportChat;
   final ChatSession? selectedChat;
 
   const SideNav({
@@ -28,6 +29,7 @@ class SideNav extends StatefulWidget {
     required this.onDeleteChat,
     required this.onArchiveChat,
     required this.onRenameChat,
+    required this.onExportChat,
     this.selectedChat,
   });
 
@@ -137,6 +139,7 @@ class _SideNavState extends State<SideNav> {
                             onRename: () => _showRenameDialog(chat),
                             onArchive: () => widget.onArchiveChat(chat),
                             onDelete: () => widget.onDeleteChat(chat),
+                            onExport: () => widget.onExportChat(chat),
                           );
                         },
                         separatorBuilder: (context, index) {
@@ -183,6 +186,7 @@ class ChatListTile extends StatefulWidget {
   final VoidCallback onRename;
   final VoidCallback onArchive;
   final VoidCallback onDelete;
+  final VoidCallback onExport;
 
   const ChatListTile({
     super.key,
@@ -192,6 +196,7 @@ class ChatListTile extends StatefulWidget {
     required this.onRename,
     required this.onArchive,
     required this.onDelete,
+    required this.onExport,
   });
 
   @override
@@ -245,6 +250,8 @@ class _ChatListTileState extends State<ChatListTile> {
                 widget.onArchive();
               } else if (value == 'delete') {
                 widget.onDelete();
+              } else if (value == 'export') {
+                widget.onExport();
               }
             },
             itemBuilder: (context) => [
@@ -275,6 +282,17 @@ class _ChatListTileState extends State<ChatListTile> {
                   children: <Widget>[
                     Icon(Icons.delete_outline),
                     Text('Delete', style: TextStyle(color: fgColor)),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(height: 3, indent: 10, endIndent: 10),
+              PopupMenuItem(
+                value: 'export',
+                child: Row(
+                  spacing: 12,
+                  children: <Widget>[
+                    const Icon(Icons.download),
+                    Text('Export', style: TextStyle(color: fgColor)),
                   ],
                 ),
               ),

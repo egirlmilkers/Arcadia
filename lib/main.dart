@@ -35,10 +35,11 @@ void main() {
 // - Attachment display
 // - thinking dropdown
 // - action buttons
-// - export chat to JSONL
-// - sort chats by last modified
 
+// - problems (print)
+// - comments and spacing
 // - github autobuild
+// - web version
 
 // ===== Future Updates =====
 // - android version
@@ -53,19 +54,23 @@ void main() {
 // - action buttons scroll with app bar
 // - selectable syntax themes
 // - table format
+// - thought for x
 
 class ChatMessage {
   final String id;
   final String text;
   final bool isUser;
   final List<String> attachments;
+  final DateTime createdAt;
 
   ChatMessage({
     required this.text,
     required this.isUser,
     this.attachments = const [],
     String? id,
-  }) : id = id ?? Uuid().v4();
+    DateTime? createdAt,
+  }) : id = id ?? const Uuid().v4(),
+      createdAt = createdAt ?? DateTime.now();
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
     return ChatMessage(
@@ -73,6 +78,7 @@ class ChatMessage {
       text: json['text'],
       isUser: json['isUser'],
       attachments: List<String>.from(json['attachments']),
+      createdAt: DateTime.parse(json['createdAt']),
     );
   }
 
@@ -82,6 +88,7 @@ class ChatMessage {
       'text': text,
       'isUser': isUser,
       'attachments': attachments,
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 }
@@ -110,6 +117,13 @@ class ChatSession {
       'title': title,
       'messages': messages.map((message) => message.toJson()).toList(),
     };
+  }
+
+  DateTime get lastModified {
+    if (messages.isEmpty) {
+      return DateTime.fromMillisecondsSinceEpoch(0);
+    }
+    return messages.last.createdAt;
   }
 }
 

@@ -24,10 +24,15 @@ class ChatHistoryService {
 
       final chats = <ChatSession>[];
       for (final file in chatFiles) {
-        final content = await (file as File).readAsString();
-        final json = jsonDecode(content);
-        chats.add(ChatSession.fromJson(json));
+        try {
+          final content = await (file as File).readAsString();
+          final json = jsonDecode(content);
+          chats.add(ChatSession.fromJson(json));
+        } catch (e) {
+          print('Error loading chat file: ${file.path}, $e');
+        }
       }
+      chats.sort((a, b) => b.lastModified.compareTo(a.lastModified));
       return chats;
     } catch (e) {
       print('Error loading chats: $e');

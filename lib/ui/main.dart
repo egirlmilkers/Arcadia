@@ -1,8 +1,14 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../main.dart';
 import '../services/chat_history.dart';
@@ -93,6 +99,32 @@ class _MainUIState extends State<MainUI> {
       }
     }
     setState(() {});
+  }
+
+  Future<File?> _exportChat(ChatSession chat) async {
+    if (await Permission.storage.status.isGranted) {
+      final downloadsDir = await getDownloadsDirectory();
+
+      final chatMessages = chat.messages.map((message) {
+        return {
+          "role": message.isUser ? "user" : "model",
+          "content": message.text,
+        };
+      }).toList();
+
+      final json = {"messages": chatMessages};
+
+      String? savePath = await FilePicker.platform.saveFile(
+        fileName: '${chat.title}.pdf',
+        allowedExtensions: ['json'],
+        initialDirectory: downloadsDir.toString(),
+      );
+
+      if (savePath == null) return null;
+      return await File(savePath).writeAsBytes(utf8.encode(jsonEncode(json)));
+    } else {
+      return null;
+    }
   }
 
   void _selectChat(ChatSession chat) {
@@ -344,6 +376,7 @@ class _MainUIState extends State<MainUI> {
               onDeleteChat: _deleteChat,
               onArchiveChat: _archiveChat,
               onRenameChat: _renameChat,
+              onExportChat: _exportChat,
             ),
           ),
         ],
