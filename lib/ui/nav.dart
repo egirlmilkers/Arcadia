@@ -115,8 +115,8 @@ class _SideNavState extends State<SideNav> {
                   onPressed: widget.onNewChat,
                   icon: Icons.rate_review_outlined,
                   label: "New Chat",
-                  backgroundColor: theme.colorScheme.primaryContainer,
-                  foregroundColor: theme.colorScheme.onPrimaryContainer,
+                  backgroundColor: theme.colorScheme.tertiaryContainer,
+                  foregroundColor: theme.colorScheme.onTertiaryContainer,
                 ),
                 if (widget.isExpanded) ...[
                   const SizedBox(height: 20),

@@ -5,7 +5,8 @@ import '../../syntax/syntax_view.dart';
 import '../../syntax/themes.dart';
 import '../../util.dart';
 
-class CodeBlock extends StatelessWidget {
+// 1. Converted to a StatefulWidget
+class CodeBlock extends StatefulWidget {
   final String code;
   final String language;
   final Brightness brightness;
@@ -18,21 +19,43 @@ class CodeBlock extends StatelessWidget {
   });
 
   @override
+  State<CodeBlock> createState() => _CodeBlockState();
+}
+
+class _CodeBlockState extends State<CodeBlock> {
+  // 2. Create a ScrollController
+  late final ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize the controller
+    _scrollController = ScrollController();
+  }
+
+  @override
+  void dispose() {
+    // Dispose of the controller when the widget is removed
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Access widget properties via `widget.`
     final appTheme = Theme.of(context);
     final Map<String, TextStyle> theme =
-        (brightness == Brightness.dark
+        (widget.brightness == Brightness.dark
             ? themes['atom-one-dark']
             : themes['atom-one-light']) ??
-        const {}; // should never reach this
+        const {};
 
     return Container(
-      margin: EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.transparent, // Background color of the code block
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(12.0),
       ),
-      // ClipRRect ensures the child's corners are also rounded
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12.0),
         child: Column(
@@ -55,12 +78,10 @@ class CodeBlock extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    language == '' ? 'plaintext' : language,
+                    widget.language == '' ? 'plaintext' : widget.language,
                     style: TextStyle(
                       fontFamily: 'GoogleSansCode',
-                      fontVariations: const [
-                        FontVariation('wght', 700.0)
-                      ],
+                      fontVariations: const [FontVariation('wght', 700.0)],
                       color: theme['root']?.color?.withValues(alpha: 0.7),
                     ),
                   ),
@@ -72,14 +93,15 @@ class CodeBlock extends StatelessWidget {
                     ),
                     tooltip: 'Copy code',
                     onPressed: () {
-                      Clipboard.setData(ClipboardData(text: code.trim()));
+                      Clipboard.setData(
+                        ClipboardData(text: widget.code.trim()),
+                      );
                       showCopiedToast(context, appTheme.colorScheme);
                     },
                   ),
                 ],
               ),
             ),
-
             const SizedBox(height: 1.5),
 
             // Code Section
@@ -90,27 +112,31 @@ class CodeBlock extends StatelessWidget {
                   top: Radius.circular(6),
                 ),
               ),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(6),
-                  ),
-                  child: SyntaxView(
-                    cleanCode(code),
-                    language: language,
-                    theme: theme,
-                    padding: const EdgeInsets.only(
-                      left: 24,
-                      right: 24,
-                      top: 20,
-                      bottom: 6,
-                    ),
-                    textStyle: TextStyle(
-                      fontFamily: 'GoogleSansCode',
-                      fontVariations: const [
-                        FontVariation('wght', 400.0)
-                      ],
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(6),
+                ),
+                child: Scrollbar(
+                  thumbVisibility: true,
+                  trackVisibility: true,
+                  controller: _scrollController,
+                  child: SingleChildScrollView(
+                    controller: _scrollController,
+                    scrollDirection: Axis.horizontal,
+                    child: SyntaxView(
+                      cleanCode(widget.code),
+                      language: widget.language,
+                      theme: theme,
+                      padding: const EdgeInsets.only(
+                        left: 24,
+                        right: 24,
+                        top: 20,
+                        bottom: 6,
+                      ),
+                      textStyle: const TextStyle(
+                        fontFamily: 'GoogleSansCode',
+                        fontVariations: [FontVariation('wght', 400.0)],
+                      ),
                     ),
                   ),
                 ),
@@ -123,11 +149,12 @@ class CodeBlock extends StatelessWidget {
   }
 }
 
+// Your cleanCode function remains the same
 String cleanCode(String code) {
+  // ... (no changes needed here)
   final lines = code.split('\n');
   int minIndent = -1;
 
-  // 1. Find the minimum indentation of all non-empty lines
   for (final line in lines) {
     if (line.trim().isNotEmpty) {
       final currentIndent = line.length - line.trimLeft().length;
@@ -137,14 +164,11 @@ String cleanCode(String code) {
     }
   }
 
-  // do nothing if no weird indents
   if (minIndent <= 0) return code.trim();
 
-  // 2. Remove that minimum indentation from every line
   final cleanedCode = lines
       .map((line) => line.length > minIndent ? line.substring(minIndent) : '')
       .join('\n');
 
-  // 3. Reconstruct the code block
   return cleanedCode;
 }

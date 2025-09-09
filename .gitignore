@@ -111,3 +111,4 @@ coverage/
 
 # unused fonts
 assets/fonts/GoogleSansFlex*.ttf
+devtools_options.yaml

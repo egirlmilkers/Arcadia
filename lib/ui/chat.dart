@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +10,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:toastification/toastification.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import 'welcome.dart';
 import 'md/code_block.dart';
@@ -40,6 +44,7 @@ class _ChatUIState extends State<ChatUI> {
   final ChatHistoryService _chatHistoryService = ChatHistoryService();
   bool _isLoading = false;
   GeminiService? _geminiService;
+  List<PlatformFile> _attachments = [];
 
   @override
   void dispose() {
@@ -52,10 +57,37 @@ class _ChatUIState extends State<ChatUI> {
     if (text.isEmpty) return;
 
     final originalMessage = text;
+    final originalAttachments = List<PlatformFile>.from(_attachments);
+
     _textController.clear();
+    setState(() {
+      _attachments.clear();
+    });
+
+    // Copy attachments to a permanent location
+    final List<String> attachmentPaths = [];
+    if (originalAttachments.isNotEmpty) {
+      final docs = await getApplicationDocumentsDirectory();
+      final attachmentsDir = Directory(
+        p.join(docs.path, 'Arcadia', 'attachments'),
+      );
+      if (!await attachmentsDir.exists()) {
+        await attachmentsDir.create(recursive: true);
+      }
+
+      for (final file in originalAttachments) {
+        if (file.path != null) {
+          final newPath = p.join(attachmentsDir.path, file.name);
+          await File(file.path!).copy(newPath);
+          attachmentPaths.add(newPath);
+        }
+      }
+    }
 
     setState(() {
-      widget.chatSession.messages.add(ChatMessage(text: text, isUser: true));
+      widget.chatSession.messages.add(
+        ChatMessage(text: text, isUser: true, attachments: attachmentPaths),
+      );
       _isLoading = true;
     });
     _scrollToBottom();
@@ -68,6 +100,7 @@ class _ChatUIState extends State<ChatUI> {
       setState(() {
         widget.chatSession.messages.removeLast();
         _textController.text = originalMessage;
+        _attachments = originalAttachments;
       });
     }
 
@@ -170,6 +203,86 @@ class _ChatUIState extends State<ChatUI> {
     });
   }
 
+  void _regenerateResponse(int messageIndex) async {
+    if (messageIndex == 0) {
+      toastification.show(
+        type: ToastificationType.warning,
+        style: ToastificationStyle.flatColored,
+        title: const Text("Cannot regenerate the first message."),
+        alignment: Alignment.bottomCenter,
+        padding: const EdgeInsets.only(left: 8, right: 8),
+        autoCloseDuration: const Duration(seconds: 4),
+        borderRadius: BorderRadius.circular(100.0),
+        showProgressBar: true,
+        dragToClose: true,
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      // Remove the AI message and any subsequent messages
+      widget.chatSession.messages.removeRange(
+        messageIndex,
+        widget.chatSession.messages.length,
+      );
+    });
+    _scrollToBottom();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final apiKey = prefs.getString('gemini_api_key');
+      if (apiKey == null || apiKey.isEmpty) {
+        throw Exception("API key not set. Please set it in settings.");
+      }
+
+      final contentService = GeminiService(apiKey: apiKey);
+      _geminiService = contentService;
+
+      final modelResponse = await contentService.generateContent(
+        widget.chatSession.messages,
+        widget.selectedModel,
+      );
+
+      if (modelResponse == GeminiService.cancelledResponse) {
+        return; // User cancelled
+      }
+
+      if (modelResponse.startsWith('Error:')) {
+        throw Exception(modelResponse);
+      }
+
+      setState(() {
+        widget.chatSession.messages.add(
+          ChatMessage(text: modelResponse, isUser: false),
+        );
+      });
+      _scrollToBottom();
+
+      await _chatHistoryService.saveChat(widget.chatSession);
+    } catch (e) {
+      toastification.show(
+        type: ToastificationType.error,
+        style: ToastificationStyle.flatColored,
+        title: const Text("Something went wrong"),
+        description: Text(e.toString().replaceFirst("Exception: ", "")),
+        alignment: Alignment.bottomCenter,
+        padding: const EdgeInsets.only(left: 8, right: 8),
+        autoCloseDuration: const Duration(seconds: 4),
+        animationBuilder: (context, animation, alignment, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        borderRadius: BorderRadius.circular(100.0),
+        showProgressBar: true,
+        dragToClose: true,
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -225,6 +338,16 @@ class _ChatUIState extends State<ChatUI> {
                             message: message,
                             isLastUserMessage: isLastUserMessage,
                             isLastAiMessage: isLastAiMessage,
+                            onMessageEdited: (newText) {
+                              setState(() {
+                                widget.chatSession.messages[index].text =
+                                    newText;
+                              });
+                              _chatHistoryService.saveChat(widget.chatSession);
+                            },
+                            onRegenerate: () {
+                              _regenerateResponse(index);
+                            },
                           );
                         },
                         separatorBuilder: (context, index) {
@@ -245,100 +368,120 @@ class _ChatUIState extends State<ChatUI> {
     final themeManager = Provider.of<ThemeManager>(context, listen: false);
     final themeName = themeManager.selectedTheme;
 
-    final inputArea = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      color: theme.scaffoldBackgroundColor,
-      child: SafeArea(
-        child: Row(
-          children: [
-            Tooltip(
-              message: 'Attach files',
-              child: IconButton(
-                icon: const Icon(Icons.attach_file_outlined),
-                onPressed: () async {
-                  final result = await FilePicker.platform.pickFiles(
-                    type: FileType.custom,
-                    allowedExtensions: [
-                      // Images
-                      'jpg', 'jpeg', 'png', 'webp',
-                      // Videos
-                      'mp4', 'webm', 'mkv', 'mov',
-                      // Documents
-                      'pdf', 'txt',
-                      // Audio
-                      'mp3',
-                      'mpga',
-                      'wav',
-                      'webm',
-                      'm4a',
-                      'opus',
-                      'aac',
-                      'flac',
-                      'pcm',
-                    ],
-                  );
-                  if (result != null) {
-                    // TODO: Handle picked files
-                  }
-                },
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
+    final inputArea = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_attachments.isNotEmpty)
+          AttachmentView(
+            attachments: _attachments.map((e) => e.path!).toList(),
+            onAttachmentRemoved: (index) {
+              setState(() {
+                _attachments.removeAt(index);
+              });
+            },
+          ),
 
-            const SizedBox(width: 8),
+        Container(
+          padding: EdgeInsets.only(bottom: 8, left: 4, right: 4, top: _attachments.isNotEmpty ? 0 : 8),
+          child: SafeArea(
+            top: false, // SafeArea is only needed for the bottom.
+            child: Row(
+              children: [
+                Tooltip(
+                  message: 'Attach files',
+                  child: IconButton(
+                    icon: const Icon(Icons.attach_file_outlined),
+                    onPressed: () async {
+                      final result = await FilePicker.platform.pickFiles(
+                        allowMultiple: true,
+                        type: FileType.custom,
+                        allowedExtensions: [
+                          // Images
+                          'jpg', 'jpeg', 'png', 'webp',
+                          // Videos
+                          'mp4', 'webm', 'mkv', 'mov',
+                          // Documents
+                          'pdf', 'txt',
+                          // Audio
+                          'mp3',
+                          'mpga',
+                          'wav',
+                          'webm',
+                          'm4a',
+                          'opus',
+                          'aac',
+                          'flac',
+                          'pcm',
+                        ],
+                      );
+                      if (result != null) {
+                        setState(() {
+                          _attachments.addAll(result.files);
+                        });
+                      }
+                    },
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
 
-            Expanded(
-              child: Focus(
-                onKeyEvent: (FocusNode node, KeyEvent event) {
-                  if (HardwareKeyboard.instance.isLogicalKeyPressed(
-                        LogicalKeyboardKey.enter,
-                      ) &&
-                      !HardwareKeyboard.instance.isShiftPressed) {
-                    if (event is KeyDownEvent) {
-                      _sendMessage();
-                    }
-                    return KeyEventResult.handled;
-                  }
-                  return KeyEventResult.ignored;
-                },
-                child: TextField(
-                  controller: _textController,
-                  readOnly: _isLoading,
-                  decoration: InputDecoration(
-                    hintText: _isLoading ? null : 'Ask $themeName',
-                    hint: _isLoading ? const ThinkingSpinner() : null,
-                    filled: true,
-                    fillColor: theme.colorScheme.surfaceContainer,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24.0),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 20.0,
-                      vertical: 10.0,
+                const SizedBox(width: 8),
+
+                Expanded(
+                  child: Focus(
+                    onKeyEvent: (FocusNode node, KeyEvent event) {
+                      if (HardwareKeyboard.instance.isLogicalKeyPressed(
+                            LogicalKeyboardKey.enter,
+                          ) &&
+                          !HardwareKeyboard.instance.isShiftPressed) {
+                        if (event is KeyDownEvent) {
+                          _sendMessage();
+                        }
+                        return KeyEventResult.handled;
+                      }
+                      return KeyEventResult.ignored;
+                    },
+                    child: TextField(
+                      controller: _textController,
+                      readOnly: _isLoading,
+                      decoration: InputDecoration(
+                        hintText: _isLoading ? null : 'Ask $themeName',
+                        hint: _isLoading ? const ThinkingSpinner() : null,
+                        filled: true,
+                        fillColor: theme.colorScheme.surfaceContainer,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24.0),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20.0,
+                          vertical: 10.0,
+                        ),
+                      ),
+                      minLines: 1,
+                      maxLines: 5,
                     ),
                   ),
-                  minLines: 1,
-                  maxLines: 5,
                 ),
-              ),
-            ),
-            const SizedBox(width: 8.0),
-            Tooltip(
-              message: _isLoading ? 'Stop' : 'Send message',
-              child: IconButton(
-                icon: Icon(_isLoading ? Icons.stop : Icons.send),
-                onPressed: _isLoading ? _stopMessage : _sendMessage,
-                style: IconButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary,
-                  foregroundColor: theme.colorScheme.onPrimary,
-                  padding: const EdgeInsets.all(12.0),
+                const SizedBox(width: 8.0),
+                Tooltip(
+                  message: _isLoading ? 'Stop' : 'Send message',
+                  child: IconButton(
+                    icon: Icon(_isLoading ? Icons.stop : Icons.send),
+                    onPressed: _isLoading ? _stopMessage : _sendMessage,
+                    style: IconButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: theme.colorScheme.onPrimary,
+                      padding: const EdgeInsets.all(12.0),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+      ],
+      //   ),
+      // ),
     );
 
     return Center(
@@ -350,16 +493,141 @@ class _ChatUIState extends State<ChatUI> {
   }
 }
 
+class AttachmentView extends StatefulWidget {
+  final List<String> attachments;
+  final Function(int)? onAttachmentRemoved;
+
+  const AttachmentView({
+    super.key,
+    required this.attachments,
+    this.onAttachmentRemoved,
+  });
+
+  @override
+  State<AttachmentView> createState() => _AttachmentViewState();
+}
+
+class _AttachmentViewState extends State<AttachmentView> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  IconData _getIconForFile(String filePath) {
+    final extension = p.extension(filePath).toLowerCase();
+    switch (extension) {
+      case '.jpg':
+      case '.jpeg':
+      case '.png':
+      case '.webp':
+        return Icons.image_outlined;
+      case '.mp4':
+      case '.webm':
+      case '.mkv':
+      case '.mov':
+        return Icons.movie_outlined;
+      case '.pdf':
+        return Icons.picture_as_pdf_outlined;
+      case '.txt':
+        return Icons.article_outlined;
+      case '.mp3':
+      case '.wav':
+      case '.m4a':
+      case '.opus':
+      case '.flac':
+      case '.aac':
+      case '.pcm':
+      case '.mpga':
+        return Icons.audiotrack_outlined;
+      default:
+        return Icons.insert_drive_file_outlined;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    //final theme = Theme.of(context);
+
+    if (widget.attachments.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      height: 50,
+      color: Colors.transparent,
+      child: Scrollbar(
+        controller: _scrollController,
+        thickness: 6,
+        thumbVisibility: true,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 5),
+          child: ListView.builder(
+            controller: _scrollController,
+            scrollDirection: Axis.horizontal,
+            itemCount: widget.attachments.length,
+            shrinkWrap: true,
+            itemBuilder: (context, index) {
+              final filePath = widget.attachments[index];
+              final fileName = p.basenameWithoutExtension(filePath);
+              final fileExt = p.extension(filePath);
+
+              return Padding(
+                padding: const EdgeInsets.only(left: 8.0),
+                child: InputChip(
+                  avatar: Icon(_getIconForFile(filePath), size: 18),
+                  // disabledColor: theme.colorScheme.onPrimary,
+                  // labelStyle: widget.onAttachmentRemoved == null ? TextStyle(
+                  //   color: theme.colorScheme.primary,
+                  // ) : null,
+                  label: Container(
+                    constraints: BoxConstraints(maxWidth: 120),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            fileName,
+                            overflow: TextOverflow.fade,
+                            softWrap: false, // good practice with ellipsis
+                          ),
+                        ),
+                        Text(fileExt), // always visible
+                      ],
+                    ),
+                  ),
+                  onDeleted: widget.onAttachmentRemoved != null
+                      ? () => widget.onAttachmentRemoved!(index)
+                      : null,
+                  deleteIcon: widget.onAttachmentRemoved != null
+                      ? const Icon(Icons.cancel, size: 18)
+                      : null,
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class MessageBubble extends StatefulWidget {
   final ChatMessage message;
   final bool isLastUserMessage;
   final bool isLastAiMessage;
+  final Function(String) onMessageEdited;
+  final VoidCallback onRegenerate;
 
   const MessageBubble({
     super.key,
     required this.message,
     this.isLastUserMessage = false,
     this.isLastAiMessage = false,
+    required this.onMessageEdited,
+    required this.onRegenerate,
   });
 
   @override
@@ -373,12 +641,21 @@ class _MessageBubbleState extends State<MessageBubble>
   static const int _maxLength = 300;
   bool _hasAnimated = false;
   bool _isHovering = false;
+  bool _isEditing = false;
+  late TextEditingController _editingController;
 
   @override
   void initState() {
     super.initState();
     _isLongMessage = widget.message.text.length > _maxLength;
     _isExpanded = !(_isLongMessage && widget.message.isUser);
+    _editingController = TextEditingController(text: widget.message.text);
+  }
+
+  @override
+  void dispose() {
+    _editingController.dispose();
+    super.dispose();
   }
 
   @override
@@ -401,94 +678,114 @@ class _MessageBubbleState extends State<MessageBubble>
         (!isUser && widget.isLastAiMessage) ||
         _isHovering;
 
+    if (_isEditing) {
+      return _buildEditingView(context);
+    }
+
     Widget messageWidget = MouseRegion(
       onEnter: (_) => setState(() => _isHovering = true),
       onExit: (_) => setState(() => _isHovering = false),
       child: Align(
         alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-        child: Container(
-          margin: EdgeInsets.only(
-            top: 4.0,
-            bottom: 4.0,
-            left: isUser ? 40.0 : 0.0,
-            right: isUser ? 0.0 : 40.0,
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-          decoration: BoxDecoration(
-            color: isUser
-                ? theme.colorScheme.primaryContainer
-                : Colors.transparent,
-            borderRadius: isUser
-                ? const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(5),
-                    bottomLeft: Radius.circular(20),
-                    bottomRight: Radius.circular(20),
-                  )
-                : const BorderRadius.only(
-                    topLeft: Radius.circular(5),
-                    topRight: Radius.circular(20),
-                    bottomLeft: Radius.circular(20),
-                    bottomRight: Radius.circular(20),
-                  ),
-          ),
-          constraints: BoxConstraints(
-            maxWidth: isUser ? 500 : MediaQuery.of(context).size.width * 0.75,
-            minWidth: 150,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: isUser
-                ? MainAxisAlignment.spaceBetween
-                : MainAxisAlignment.start,
-            children: [
-              if (!isUser)
-                AnimatedOpacity(
-                  opacity: shouldShowButtons ? 1.0 : 0.0,
-                  duration: 200.ms,
-                  child: _buildActionBar(context, isUser),
-                ),
-              if (!isUser) const SizedBox(width: 8.0),
-              Flexible(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (widget.message.text.isNotEmpty)
-                      SelectionArea(
-                        focusNode: FocusNode(),
-                        selectionControls: materialTextSelectionControls,
-                        child: GptMarkdown(
-                          messageText,
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            color: isUser
-                                ? theme.colorScheme.onPrimaryContainer
-                                : theme.colorScheme.onSurface,
-                          ),
-                          codeBuilder: (context, name, code, closed) {
-                            return CodeBlock(
-                              language: name,
-                              code: code,
-                              brightness: Theme.of(context).brightness,
-                            );
-                          },
-                          highlightBuilder: (context, text, style) {
-                            return Highlight(text: text);
-                          },
-                        ),
-                      ),
-                  ],
-                ),
+        child: Column(
+          crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            if (widget.message.attachments.isNotEmpty)
+              AttachmentView(attachments: widget.message.attachments),
+
+            Container(
+              margin: EdgeInsets.only(
+                top: 4.0,
+                bottom: 4.0,
+                left: isUser ? 40.0 : 0.0,
+                right: isUser ? 0.0 : 40.0,
               ),
-              if (isUser) const SizedBox(width: 8.0),
-              if (isUser)
-                AnimatedOpacity(
-                  opacity: shouldShowButtons ? 1.0 : 0.0,
-                  duration: 200.ms,
-                  child: _buildActionBar(context, isUser),
-                ),
-            ],
-          ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12.0,
+                vertical: 10.0,
+              ),
+              decoration: BoxDecoration(
+                color: isUser
+                    ? theme.colorScheme.primaryContainer
+                    : Colors.transparent,
+                borderRadius: isUser
+                    ? const BorderRadius.only(
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(5),
+                        bottomLeft: Radius.circular(20),
+                        bottomRight: Radius.circular(20),
+                      )
+                    : const BorderRadius.only(
+                        topLeft: Radius.circular(5),
+                        topRight: Radius.circular(20),
+                        bottomLeft: Radius.circular(20),
+                        bottomRight: Radius.circular(20),
+                      ),
+              ),
+              constraints: BoxConstraints(
+                maxWidth: isUser
+                    ? 500
+                    : MediaQuery.of(context).size.width * 0.75,
+                minWidth: 150,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: isUser
+                    ? MainAxisAlignment.spaceBetween
+                    : MainAxisAlignment.start,
+                children: [
+                  if (!isUser) ...[
+                    AnimatedOpacity(
+                      opacity: shouldShowButtons ? 1.0 : 0.0,
+                      duration: 200.ms,
+                      child: _buildActionBar(context, isUser),
+                    ),
+                    const SizedBox(width: 8.0),
+                  ],
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SelectionArea(
+                          //focusNode: FocusNode(),
+                          selectionControls: materialTextSelectionControls,
+                          child: GptMarkdown(
+                            messageText,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: isUser
+                                  ? theme.colorScheme.onPrimaryContainer
+                                  : theme.colorScheme.onSurface,
+                              // fontWeight: isUser ? FontWeight.w500 : null,
+                              // letterSpacing: isUser ? 0 : null,
+                              // wordSpacing: isUser ? 1.5 : null,
+                            ),
+                            codeBuilder: (context, name, code, closed) {
+                              return CodeBlock(
+                                language: name,
+                                code: code,
+                                brightness: Theme.of(context).brightness,
+                              );
+                            },
+                            highlightBuilder: (context, text, style) {
+                              return Highlight(text: text);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (isUser) const SizedBox(width: 8.0),
+                  if (isUser)
+                    AnimatedOpacity(
+                      opacity: shouldShowButtons ? 1.0 : 0.0,
+                      duration: 200.ms,
+                      child: _buildActionBar(context, isUser),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -537,7 +834,9 @@ class _MessageBubbleState extends State<MessageBubble>
               Tooltip(
                 message: 'Edit',
                 child: _buildIconButton(context, Icons.edit_outlined, () {
-                  // TODO: Implement edit
+                  setState(() {
+                    _isEditing = true;
+                  });
                 }, color: onPrimaryContainer),
               ),
             ]
@@ -551,9 +850,11 @@ class _MessageBubbleState extends State<MessageBubble>
               ),
               Tooltip(
                 message: 'Regenerate',
-                child: _buildIconButton(context, Icons.refresh_outlined, () {
-                  // TODO: Implement regenerate
-                }),
+                child: _buildIconButton(
+                  context,
+                  Icons.refresh_outlined,
+                  widget.onRegenerate,
+                ),
               ),
             ],
     );
@@ -572,6 +873,56 @@ class _MessageBubbleState extends State<MessageBubble>
       constraints: const BoxConstraints(),
       splashRadius: 20.0,
       color: color ?? Theme.of(context).colorScheme.onSurfaceVariant,
+    );
+  }
+
+  Widget _buildEditingView(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(8.0),
+      margin: const EdgeInsets.symmetric(vertical: 4.0),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12.0),
+      ),
+      child: Column(
+        children: [
+          TextField(
+            controller: _editingController,
+            autofocus: true,
+            maxLines: null,
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+          const SizedBox(height: 8.0),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _isEditing = false;
+                    _editingController.text = widget.message.text;
+                  });
+                },
+                child: const Text('Cancel'),
+              ),
+              const SizedBox(width: 8.0),
+              FilledButton(
+                onPressed: () {
+                  widget.onMessageEdited(_editingController.text);
+                  setState(() {
+                    _isEditing = false;
+                  });
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

@@ -32,16 +32,18 @@ void main() {
 }
 
 // ========== TODO ==========
-// - Attachment display
 // - thinking dropdown
-// - action buttons
+// - scroll issue with codeblock
+// - chats sometimes not loading
 
 // - problems (print)
 // - comments and spacing
 // - github autobuild
 // - web version
+// - raem theme
 
 // ===== Future Updates =====
+// - gemma
 // - android version
 // - allow models like chatgpt and deepseek
 // - app icon
@@ -54,11 +56,13 @@ void main() {
 // - action buttons scroll with app bar
 // - selectable syntax themes
 // - table format
-// - thought for x
+// - thought for x seconds
+// - split widgets
+// - warning popups with (dont ask again) remembering
 
 class ChatMessage {
   final String id;
-  final String text;
+  String text;
   final bool isUser;
   final List<String> attachments;
   final DateTime createdAt;

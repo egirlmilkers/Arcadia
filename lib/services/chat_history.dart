@@ -2,13 +2,14 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 
 import '../main.dart';
 
 class ChatHistoryService {
   Future<Directory> _getChatsDirectory() async {
     final docs = await getApplicationDocumentsDirectory();
-    final chatsDir = Directory('${docs.path}/Arcadia/chats');
+    final chatsDir = Directory(p.join(docs.path, 'Arcadia', 'chats'));
     if (!await chatsDir.exists()) {
       await chatsDir.create(recursive: true);
     }
@@ -43,7 +44,7 @@ class ChatHistoryService {
   Future<void> saveChat(ChatSession chat) async {
     try {
       final chatsDir = await _getChatsDirectory();
-      final file = File('${chatsDir.path}/${chat.id}.json');
+      final file = File(p.join(chatsDir.path, '${chat.id}.json'));
       await file.writeAsString(jsonEncode(chat.toJson()));
     } catch (e) {
       print('Error saving chat: $e');
@@ -53,7 +54,7 @@ class ChatHistoryService {
   Future<void> deleteChat(ChatSession chat) async {
     try {
       final chatsDir = await _getChatsDirectory();
-      final file = File('${chatsDir.path}/${chat.id}.json');
+      final file = File(p.join(chatsDir.path, '${chat.id}.json'));
       if (await file.exists()) {
         await file.delete();
       }
@@ -70,14 +71,14 @@ class ChatHistoryService {
   Future<void> archiveChat(ChatSession chat) async {
     try {
       final chatsDir = await _getChatsDirectory();
-      final archiveDir = Directory('${chatsDir.path}/archived');
+      final archiveDir = Directory(p.join(chatsDir.path, 'archived'));
       if (!await archiveDir.exists()) {
         await archiveDir.create(recursive: true);
       }
 
-      final file = File('${chatsDir.path}/${chat.id}.json');
+      final file = File(p.join(chatsDir.path, '${chat.id}.json'));
       if (await file.exists()) {
-        await file.rename('${archiveDir.path}/${chat.id}.json');
+        await file.rename(p.join(archiveDir.path, '${chat.id}.json'));
       }
     } catch (e) {
       print('Error archiving chat: $e');
