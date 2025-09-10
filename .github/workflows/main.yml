@@ -1,0 +1,74 @@
+name: Create Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Extract and Format Version
+        id: version
+        run: |
+          $pubspec_content = Get-Content ./pubspec.yaml | Out-String
+          if ($pubspec_content -match 'version:\s*(\S+)') {
+            $full_version = $matches[1].Trim()
+            $base_version = $full_version.Split('+')[0]
+            
+            # Initialize the title version with the base version
+            $release_title_version = $base_version
+            
+            # If PATCH is 0, shorten to MAJOR.MINOR
+            if ($base_version -match '^(\d+\.\d+)\.0(-.*)?$') {
+              # Combine the MAJOR.MINOR part ($matches[1]) with the optional pre-release part ($matches[2])
+              $release_title_version = $matches[1] + $matches[2]
+            }
+            
+            # Check for pre-release and apply my silly symbol formatting
+            if ($base_version -match '-') {
+              $is_prerelease = "true"
+              # Replace keywords with Greek symbols
+              $release_title_version = $release_title_version -replace 'beta', 'β' -replace 'alpha', 'α'
+            } else {
+              $is_prerelease = "false"
+            }
+
+            # changed to shut up the warning thing
+            echo "full_version=$full_version" >> $env:GITHUB_OUTPUT
+            echo "base_version=$base_version" >> $env:GITHUB_OUTPUT
+            echo "is_prerelease=$is_prerelease" >> $env:GITHUB_OUTPUT
+            echo "release_title_version=$release_title_version" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "Version not found in pubspec.yaml. Exiting."
+            exit 1
+          }
+        shell: pwsh
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Build Flutter Windows app
+        run: flutter build windows --release
+
+      - name: Zip the build artifacts
+        run: |
+          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath "Arcadia-${{ steps.version.outputs.full_version }}.zip"
+        shell: pwsh
+
+      - name: Create or Update Release
+        uses: marvinpinto/action-automatic-releases@latest
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "${{ steps.version.outputs.base_version }}"
+          prerelease: ${{ steps.version.outputs.is_prerelease }}
+          title: "Arcadia ${{ steps.version.outputs.release_title_version }}"
+          files: "Arcadia-x64-${{ steps.version.outputs.full_version }}.zip"

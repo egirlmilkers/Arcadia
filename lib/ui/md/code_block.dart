@@ -5,10 +5,15 @@ import '../../syntax/syntax_view.dart';
 import '../../syntax/themes.dart';
 import '../../util.dart';
 
-// 1. Converted to a StatefulWidget
+/// A widget for displaying a block of code with syntax highlighting.
 class CodeBlock extends StatefulWidget {
+  /// The code to display.
   final String code;
+
+  /// The programming language of the code.
   final String language;
+
+  /// The brightness of the theme to use for syntax highlighting.
   final Brightness brightness;
 
   const CodeBlock({
@@ -23,27 +28,24 @@ class CodeBlock extends StatefulWidget {
 }
 
 class _CodeBlockState extends State<CodeBlock> {
-  // 2. Create a ScrollController
   late final ScrollController _scrollController;
 
   @override
   void initState() {
     super.initState();
-    // Initialize the controller
     _scrollController = ScrollController();
   }
 
   @override
   void dispose() {
-    // Dispose of the controller when the widget is removed
     _scrollController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Access widget properties via `widget.`
     final appTheme = Theme.of(context);
+    // Determine the syntax highlighting theme based on the app's brightness.
     final Map<String, TextStyle> theme =
         (widget.brightness == Brightness.dark
             ? themes['atom-one-dark']
@@ -62,7 +64,7 @@ class _CodeBlockState extends State<CodeBlock> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header Section
+            // The header of the code block, which displays the language and a copy button.
             Container(
               decoration: BoxDecoration(
                 color: theme['root']?.backgroundColor,
@@ -77,6 +79,7 @@ class _CodeBlockState extends State<CodeBlock> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  // The name of the programming language.
                   Text(
                     widget.language == '' ? 'plaintext' : widget.language,
                     style: TextStyle(
@@ -85,6 +88,7 @@ class _CodeBlockState extends State<CodeBlock> {
                       color: theme['root']?.color?.withValues(alpha: 0.7),
                     ),
                   ),
+                  // The button for copying the code to the clipboard.
                   IconButton(
                     icon: Icon(
                       Icons.copy_outlined,
@@ -104,7 +108,7 @@ class _CodeBlockState extends State<CodeBlock> {
             ),
             const SizedBox(height: 1.5),
 
-            // Code Section
+            // The main content of the code block.
             Container(
               decoration: BoxDecoration(
                 color: theme['root']?.backgroundColor,
@@ -116,6 +120,7 @@ class _CodeBlockState extends State<CodeBlock> {
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(6),
                 ),
+                // A scrollbar for horizontally long code.
                 child: Scrollbar(
                   thumbVisibility: true,
                   trackVisibility: true,
@@ -123,6 +128,7 @@ class _CodeBlockState extends State<CodeBlock> {
                   child: SingleChildScrollView(
                     controller: _scrollController,
                     scrollDirection: Axis.horizontal,
+                    // The SyntaxView widget, which handles the actual syntax highlighting.
                     child: SyntaxView(
                       cleanCode(widget.code),
                       language: widget.language,
@@ -131,7 +137,7 @@ class _CodeBlockState extends State<CodeBlock> {
                         left: 24,
                         right: 24,
                         top: 20,
-                        bottom: 6,
+                        bottom: 16,
                       ),
                       textStyle: const TextStyle(
                         fontFamily: 'GoogleSansCode',
@@ -149,9 +155,8 @@ class _CodeBlockState extends State<CodeBlock> {
   }
 }
 
-// Your cleanCode function remains the same
+/// Removes common leading indentation from a block of code.
 String cleanCode(String code) {
-  // ... (no changes needed here)
   final lines = code.split('\n');
   int minIndent = -1;
 

@@ -12,12 +12,15 @@ import 'package:path_provider/path_provider.dart';
 
 import '../main.dart';
 import '../services/chat_history.dart';
+import '../services/logging.dart';
 import '../services/model.dart';
 import '../theme/manager.dart';
 import 'chat.dart';
 import 'nav.dart';
 import 'welcome.dart';
 
+/// The main UI of the application, which orchestrates the different parts of
+/// the screen, including the side navigation, chat view, and app bar.
 class MainUI extends StatefulWidget {
   const MainUI({super.key});
 
@@ -25,21 +28,43 @@ class MainUI extends StatefulWidget {
   State<MainUI> createState() => _MainUIState();
 }
 
+/// The state for the [MainUI] widget.
+///
+/// This class manages the active chat session, chat history, and the state
+/// of the side navigation bar.
 class _MainUIState extends State<MainUI> {
+  /// The currently active chat session.
   ChatSession? _activeChat;
+
+  /// The list of all chat sessions.
   List<ChatSession> _chatHistory = [];
+
+  /// The service for managing chat history.
   final ChatHistoryService _chatHistoryService = ChatHistoryService();
+
+  /// Whether the side navigation bar is pinned open.
   bool _isPinned = true;
+
+  /// Whether the mouse is hovering over the side navigation bar.
   bool _isHovering = false;
 
   @override
   void initState() {
     super.initState();
+    _initializeServices();
     _loadChatHistory();
     _loadPinState();
     _startNewChat();
   }
 
+  /// Initializes the services, including the logging service.
+  Future<void> _initializeServices() async {
+    await Logging.configure();
+    final logger = Logging();
+    logger.info('Services initialized');
+  }
+
+  /// Loads the pinned state of the side navigation bar from shared preferences.
   void _loadPinState() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -47,61 +72,69 @@ class _MainUIState extends State<MainUI> {
     });
   }
 
+  /// Saves the pinned state of the side navigation bar to shared preferences.
   void _savePinState(bool isPinned) async {
     final prefs = await SharedPreferences.getInstance();
     prefs.setBool('isPinned', isPinned);
+    Logging().info('Saved pin state: $isPinned');
   }
 
+  /// Loads the chat history from the chat history service.
   Future<void> _loadChatHistory() async {
     _chatHistory = await _chatHistoryService.loadChats();
   }
 
+  /// Starts a new chat session.
   void _startNewChat() {
     setState(() {
       _activeChat = ChatSession(title: 'New Chat', messages: []);
     });
+    Logging().info('Started new chat');
   }
 
+  /// Deletes a chat session.
   void _deleteChat(ChatSession chat) async {
-    // If the active chat is the one being deleted, set it to null.
     if (_activeChat?.id == chat.id) {
       _activeChat = null;
     }
     await _chatHistoryService.deleteChat(chat);
     await _loadChatHistory();
-    setState(() {}); // Rebuild the UI with the updated list and active chat.
+    setState(() {});
+    Logging().info('Deleted chat with ID: ${chat.id}');
   }
 
+  /// Archives a chat session.
   void _archiveChat(ChatSession chat) async {
-    // Archiving should also clear the active chat view.
     if (_activeChat?.id == chat.id) {
       _activeChat = null;
     }
     await _chatHistoryService.archiveChat(chat);
     await _loadChatHistory();
     setState(() {});
+    Logging().info('Archived chat with ID: ${chat.id}');
   }
 
+  /// Renames a chat session.
   void _renameChat(ChatSession chat, String newTitle) async {
     final activeChatId = _activeChat?.id;
     await _chatHistoryService.renameChat(chat, newTitle);
     await _loadChatHistory();
 
-    // If the renamed chat was the active one, find its new instance in the
-    // updated list and set it as the active chat. This ensures the title
-    // updates everywhere.
     if (activeChatId == chat.id) {
       try {
         _activeChat = _chatHistory.firstWhere((c) => c.id == activeChatId);
       } catch (e) {
-        // In case the chat was deleted by another process, handle it gracefully.
         _activeChat = null;
+        Logging().warning('Failed to find renamed chat in history', e);
       }
     }
     setState(() {});
+    Logging().info('Renamed chat with ID: ${chat.id} to "$newTitle"');
   }
 
+  /// Exports a chat session to a JSON file.
   Future<File?> _exportChat(ChatSession chat) async {
+    final logger = Logging();
     if (await Permission.storage.status.isGranted) {
       final downloadsDir = await getDownloadsDirectory();
 
@@ -115,30 +148,40 @@ class _MainUIState extends State<MainUI> {
       final json = {"messages": chatMessages};
 
       String? savePath = await FilePicker.platform.saveFile(
-        fileName: '${chat.title}.pdf',
+        fileName: '${chat.title}.json',
         allowedExtensions: ['json'],
         initialDirectory: downloadsDir.toString(),
       );
 
-      if (savePath == null) return null;
+      if (savePath == null) {
+        logger.info('Chat export cancelled by user.');
+        return null;
+      }
+      logger.info('Exporting chat "${chat.title}" to $savePath');
       return await File(savePath).writeAsBytes(utf8.encode(jsonEncode(json)));
     } else {
+      logger.warning('Storage permission not granted. Cannot export chat.');
       return null;
     }
   }
 
+  /// Selects a chat session to be the active one.
   void _selectChat(ChatSession chat) {
     setState(() {
       _activeChat = chat;
     });
+    Logging().info('Selected chat with ID: ${chat.id}');
   }
 
+  /// Resets the view to the home screen by clearing the active chat.
   void _resetToHome() {
     setState(() {
       _activeChat = null;
     });
+    Logging().info('Reset to home screen');
   }
 
+  /// Toggles the pinned state of the side navigation bar.
   void _toggleSidebar() {
     setState(() {
       _isPinned = !_isPinned;
@@ -146,8 +189,9 @@ class _MainUIState extends State<MainUI> {
     });
   }
 
+  /// Handles mouse hover events on the side navigation bar to expand or
+  /// collapse it when it's not pinned.
   void _handleHover(bool hover) {
-    // We only want to expand on hover if the sidebar is not pinned open
     if (!_isPinned) {
       setState(() {
         _isHovering = hover;
@@ -157,32 +201,39 @@ class _MainUIState extends State<MainUI> {
 
   @override
   Widget build(BuildContext context) {
+    // Get the theme and model managers from the provider.
     final themeManager = context.watch<ThemeManager>();
     final modelManager = context.watch<ModelManager>();
     final theme = Theme.of(context);
 
-    // Add this check at the top of the build method.
+    // Show a loading indicator while the models are being loaded.
     if (modelManager.loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    // Determine the gradient colors for the app bar title.
     final gradientColors =
         themeManager.currentTheme?.gradientColors ??
         [theme.colorScheme.primary, theme.colorScheme.tertiary];
+    // Determine whether the side navigation should be expanded.
     final bool isEffectivelyExpanded = _isPinned || _isHovering;
 
     return Scaffold(
+      // Use a Stack to overlay the side navigation on top of the main content.
       body: Stack(
         children: [
+          // The main content area, which is padded based on the sidebar state.
           AnimatedPadding(
             duration: 200.ms,
             padding: EdgeInsets.only(left: _isPinned ? 280 : 74),
             child: Scaffold(
               backgroundColor: Colors.transparent,
+              // The app bar at the top of the screen.
               appBar: AppBar(
                 backgroundColor: Colors.transparent,
                 elevation: 0,
                 scrolledUnderElevation: 0,
+                // The title of the app, which also acts as a home button.
                 title: GestureDetector(
                   onTap: _resetToHome,
                   child: ShaderMask(
@@ -193,7 +244,7 @@ class _MainUIState extends State<MainUI> {
                     ).createShader(bounds),
                     child: Text(
                       themeManager.selectedTheme,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w500,
                         color: Colors.white,
@@ -201,26 +252,24 @@ class _MainUIState extends State<MainUI> {
                     ),
                   ),
                 ),
+                // The actions on the right side of the app bar.
                 actions: [
+                  // The model selection dropdown.
                   if (!modelManager.loading)
                     Center(
                       child: Tooltip(
                         message: "Choose your model",
                         child: Builder(
-                          // A Builder is used here to get a specific context for the button,
-                          // which is needed to calculate its position on the screen for `showMenu`.
                           builder: (BuildContext context) {
                             return Material(
                               color: Theme.of(
                                 context,
                               ).colorScheme.surfaceContainer,
                               borderRadius: BorderRadius.circular(24),
-                              clipBehavior: Clip
-                                  .antiAlias, // Ensures the InkWell ripple is clipped
+                              clipBehavior: Clip.antiAlias,
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(24),
                                 onTap: () {
-                                  // THIS IS THE SIMPLIFIED PART
                                   final RenderBox button =
                                       context.findRenderObject() as RenderBox;
                                   final RenderBox overlay =
@@ -229,7 +278,7 @@ class _MainUIState extends State<MainUI> {
                                           ).context.findRenderObject()
                                           as RenderBox;
 
-                                  // 1. Get the button's position and size in the overlay's coordinate system.
+                                  // Calculate the position of the dropdown menu.
                                   final Rect buttonRect = Rect.fromPoints(
                                     button.localToGlobal(
                                       Offset.zero,
@@ -241,18 +290,16 @@ class _MainUIState extends State<MainUI> {
                                     ),
                                   );
 
-                                  // 2. offset the menu to show next to the dropdown button
                                   final Rect shiftedButtonRect = buttonRect
                                       .translate(-110.0, 0.0);
 
-                                  // 3. Create the RelativeRect for the menu's position.
                                   final RelativeRect position =
                                       RelativeRect.fromRect(
                                         shiftedButtonRect,
                                         Offset.zero & overlay.size,
                                       );
 
-                                  // Show the menu anchored to the button's calculated position.
+                                  // Show the dropdown menu.
                                   showMenu<String>(
                                     context: context,
                                     position: position,
@@ -286,7 +333,6 @@ class _MainUIState extends State<MainUI> {
                                       );
                                     }).toList(),
                                   ).then((String? value) {
-                                    // This is the equivalent of `onSelected`.
                                     if (value != null) {
                                       modelManager.setSelectedModel(value);
                                     }
@@ -300,8 +346,7 @@ class _MainUIState extends State<MainUI> {
                                     bottom: 8,
                                   ),
                                   child: Row(
-                                    mainAxisSize: MainAxisSize
-                                        .min, // Fit the row to its content
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
                                         modelManager.selectedModel.displayName,
@@ -320,10 +365,12 @@ class _MainUIState extends State<MainUI> {
                   const SizedBox(width: 16),
                 ],
               ),
+              // The body of the scaffold, which contains the chat UI.
               body: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
+                    // An animated switcher to transition between the welcome screen and the chat UI.
                     child: AnimatedSwitcher(
                       duration: 500.ms,
                       transitionBuilder:
@@ -333,8 +380,10 @@ class _MainUIState extends State<MainUI> {
                               child: child,
                             );
                           },
+                      // If there is no active chat, show the welcome UI.
                       child: _activeChat == null
                           ? const WelcomeUI()
+                          // Otherwise, show the chat UI.
                           : ChatUI(
                               key: ValueKey(_activeChat!.id),
                               chatSession: _activeChat!,
@@ -363,6 +412,7 @@ class _MainUIState extends State<MainUI> {
               ),
             ),
           ),
+          // The side navigation bar.
           MouseRegion(
             onEnter: (_) => _handleHover(true),
             onExit: (_) => _handleHover(false),

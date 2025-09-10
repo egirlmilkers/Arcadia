@@ -1,7 +1,9 @@
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import 'package:file_picker/file_picker.dart';
@@ -19,14 +21,26 @@ import 'md/highlight.dart';
 import '../main.dart';
 import '../services/chat_history.dart';
 import '../services/gemini.dart';
+import '../services/logging.dart';
 import '../theme/manager.dart';
 import '../util.dart';
 import 'widgets/thinking_spinner.dart';
 
+/// A widget that displays a chat session, including messages, a text input
+/// area, and attachments.
+///
+/// This widget is responsible for handling user input, sending messages to the
+/// Gemini API, and displaying the conversation.
 class ChatUI extends StatefulWidget {
+  /// The chat session to be displayed.
   final ChatSession chatSession;
+
+  /// The name of the selected model for content generation.
   final String selectedModel;
+
+  /// A callback function that is called when a new message is sent.
   final Function(String)? onNewMessage;
+
   const ChatUI({
     super.key,
     required this.chatSession,
@@ -42,16 +56,31 @@ class _ChatUIState extends State<ChatUI> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final ChatHistoryService _chatHistoryService = ChatHistoryService();
+  final Logging _logger = Logging();
   bool _isLoading = false;
   GeminiService? _geminiService;
   List<PlatformFile> _attachments = [];
+  //bool _isScrolling = false; // Add this line
+
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   _
+  // }
 
   @override
   void dispose() {
+    _scrollController.dispose();
+    // Cancel any ongoing Gemini service call to prevent memory leaks.
     _geminiService?.cancel();
     super.dispose();
   }
 
+  /// Sends a message to the Gemini API.
+  ///
+  /// This method handles text and attachments, updates the UI optimistically,
+  /// and calls the Gemini service to generate a response. It also handles
+  /// title generation for new chats.
   void _sendMessage() async {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
@@ -64,7 +93,7 @@ class _ChatUIState extends State<ChatUI> {
       _attachments.clear();
     });
 
-    // Copy attachments to a permanent location
+    // Copy attachments to a permanent location to ensure they are not lost.
     final List<String> attachmentPaths = [];
     if (originalAttachments.isNotEmpty) {
       final docs = await getApplicationDocumentsDirectory();
@@ -82,8 +111,12 @@ class _ChatUIState extends State<ChatUI> {
           attachmentPaths.add(newPath);
         }
       }
+      _logger.info(
+        'Copied ${attachmentPaths.length} attachments to permanent storage.',
+      );
     }
 
+    // Optimistically update the UI with the user's message.
     setState(() {
       widget.chatSession.messages.add(
         ChatMessage(text: text, isUser: true, attachments: attachmentPaths),
@@ -92,16 +125,17 @@ class _ChatUIState extends State<ChatUI> {
     });
     _scrollToBottom();
 
-    // A new chat is defined by having only one message from the user
+    // A new chat is defined by having only one message from the user.
     final bool isNewChat = widget.chatSession.messages.length == 1;
 
-    // A local function to clean up the UI on a failed attempt (either cancel or error)
+    // A local function to revert the UI if the message fails to send.
     void revertOptimisticUI() {
       setState(() {
         widget.chatSession.messages.removeLast();
         _textController.text = originalMessage;
         _attachments = originalAttachments;
       });
+      _logger.warning('Reverted optimistic UI update.');
     }
 
     try {
@@ -117,6 +151,8 @@ class _ChatUIState extends State<ChatUI> {
 
       Map<String, dynamic> modelResponse;
       if (isNewChat) {
+        // If it's a new chat, generate a title and content concurrently.
+        _logger.info('New chat detected. Generating title and content.');
         final prompt =
             'Generate a short, concise title (5 words max) for an ai chat started with this user query:\n\n$originalMessage';
         final titleFuture = titleService.generateContent([
@@ -138,29 +174,31 @@ class _ChatUIState extends State<ChatUI> {
                 .replaceAll('"', '')
                 .trim();
           });
+          _logger.info('Generated new chat title: ${widget.chatSession.title}');
+        } else {
+          _logger.warning('Failed to generate chat title.');
         }
       } else {
+        // If it's an existing chat, just generate content.
         modelResponse = await contentService.generateContent(
           widget.chatSession.messages,
           widget.selectedModel,
         );
       }
 
-      // 1. Check for cancellation first.
+      // Handle user cancellation.
       if (modelResponse['text'] == GeminiService.cancelledResponse) {
-        // Treat user cancellation not as an error.
-        // Clean up the UI and exit gracefully.
         revertOptimisticUI();
+        _logger.info('Message sending cancelled by user.');
         return;
       }
 
-      // 2. Check for actual errors from the API.
+      // Handle API errors.
       if (modelResponse['error'] != null) {
-        // This is a real error. Throw an exception to be caught below.
         throw Exception(modelResponse['error']);
       }
 
-      // 3. If neither of the above, it's a success.
+      // On success, update the UI with the model's response.
       setState(() {
         widget.chatSession.messages.add(
           ChatMessage(
@@ -176,9 +214,11 @@ class _ChatUIState extends State<ChatUI> {
       if (isNewChat) {
         widget.onNewMessage?.call(widget.chatSession.title);
       }
-    } catch (e) {
+    } catch (e, s) {
       revertOptimisticUI();
+      _logger.error('Error sending message', e, s);
 
+      // Show an error toast to the user.
       toastification.show(
         type: ToastificationType.error,
         style: ToastificationStyle.flatColored,
@@ -195,22 +235,29 @@ class _ChatUIState extends State<ChatUI> {
         dragToClose: true,
       );
     } finally {
-      // ensuring the loading indicator is turned off
+      // Ensure the loading indicator is turned off.
       setState(() {
         _isLoading = false;
       });
     }
   }
 
+  /// Stops the currently streaming message generation.
   void _stopMessage() {
     _geminiService?.cancel();
     setState(() {
       _isLoading = false;
     });
+    _logger.info('Stopped message generation.');
   }
 
+  /// Regenerates the response for a given message.
+  ///
+  /// This method removes the previous AI response and any subsequent messages,
+  /// then calls the Gemini service to generate a new response.
   void _regenerateResponse(int messageIndex) async {
     if (messageIndex == 0) {
+      // Cannot regenerate the first message in a chat.
       toastification.show(
         type: ToastificationType.warning,
         style: ToastificationStyle.flatColored,
@@ -227,13 +274,14 @@ class _ChatUIState extends State<ChatUI> {
 
     setState(() {
       _isLoading = true;
-      // Remove the AI message and any subsequent messages
+      // Remove the AI message and any subsequent messages.
       widget.chatSession.messages.removeRange(
         messageIndex,
         widget.chatSession.messages.length,
       );
     });
     _scrollToBottom();
+    _logger.info('Regenerating response for message at index $messageIndex.');
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -250,14 +298,18 @@ class _ChatUIState extends State<ChatUI> {
         widget.selectedModel,
       );
 
+      // Handle user cancellation.
       if (modelResponse['text'] == GeminiService.cancelledResponse) {
-        return; // User cancelled
+        _logger.info('Response regeneration cancelled by user.');
+        return;
       }
 
+      // Handle API errors.
       if (modelResponse['error'] != null) {
         throw Exception(modelResponse['error']);
       }
 
+      // On success, update the UI with the new response.
       setState(() {
         widget.chatSession.messages.add(
           ChatMessage(
@@ -270,7 +322,9 @@ class _ChatUIState extends State<ChatUI> {
       _scrollToBottom();
 
       await _chatHistoryService.saveChat(widget.chatSession);
-    } catch (e) {
+    } catch (e, s) {
+      _logger.error('Error regenerating response', e, s);
+      // Show an error toast to the user.
       toastification.show(
         type: ToastificationType.error,
         style: ToastificationStyle.flatColored,
@@ -293,12 +347,15 @@ class _ChatUIState extends State<ChatUI> {
     }
   }
 
-  void _scrollToBottom() {
+  /// Scrolls the chat to the bottom.
+  ///
+  /// This is typically called after a new message is added to the chat.
+  void _scrollToBottom({int duration = 300}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
+          duration: Duration(milliseconds: duration),
           curve: Curves.easeOut,
         );
       }
@@ -309,29 +366,40 @@ class _ChatUIState extends State<ChatUI> {
   Widget build(BuildContext context) {
     return Column(
       children: [
+        // The main chat area, which is expandable.
         Expanded(
+          // A listener to handle scroll events for a smoother experience.
           child: Listener(
             behavior: HitTestBehavior.opaque,
             onPointerSignal: (event) {
               if (event is PointerScrollEvent) {
                 if (_scrollController.hasClients) {
                   _scrollController.jumpTo(
-                    _scrollController.offset + event.scrollDelta.dy,
+                    // clampDouble(
+                      _scrollController.offset + event.scrollDelta.dy,
+                    //   0,
+                    //   _scrollController.offset,
+                    // ),
+                    // duration: 100.ms,
+                    // curve: Curves.easeInOut
                   );
                 }
               }
             },
+            // If there are no messages, show the welcome UI.
             child: widget.chatSession.messages.isEmpty
                 ? const WelcomeUI()
                 : Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 900),
+                      // A list view of all the messages in the chat session.
                       child: ListView.separated(
                         controller: _scrollController,
                         padding: const EdgeInsets.all(16.0),
                         itemCount: widget.chatSession.messages.length,
                         itemBuilder: (context, index) {
                           final message = widget.chatSession.messages[index];
+                          // Determine if the message is the last one from the user or AI.
                           final lastUserMessageIndex = widget
                               .chatSession
                               .messages
@@ -344,6 +412,7 @@ class _ChatUIState extends State<ChatUI> {
                           final bool isLastAiMessage =
                               index == lastAiMessageIndex;
 
+                          // Each message is displayed in a MessageBubble.
                           return MessageBubble(
                             message: message,
                             isLastUserMessage: isLastUserMessage,
@@ -368,11 +437,13 @@ class _ChatUIState extends State<ChatUI> {
                   ),
           ),
         ),
+        // The text input area at the bottom of the screen.
         _buildTextInputArea(),
       ],
     );
   }
 
+  /// Builds the text input area, including the attach button, text field, and send button.
   Widget _buildTextInputArea() {
     final theme = Theme.of(context);
     final themeManager = Provider.of<ThemeManager>(context, listen: false);
@@ -381,6 +452,7 @@ class _ChatUIState extends State<ChatUI> {
     final inputArea = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // Display the attachment view if there are any attachments.
         if (_attachments.isNotEmpty)
           AttachmentView(
             attachments: _attachments.map((e) => e.path!).toList(),
@@ -391,6 +463,7 @@ class _ChatUIState extends State<ChatUI> {
             },
           ),
 
+        // The main container for the input controls.
         Container(
           padding: EdgeInsets.only(
             bottom: 8,
@@ -399,9 +472,10 @@ class _ChatUIState extends State<ChatUI> {
             top: _attachments.isNotEmpty ? 0 : 8,
           ),
           child: SafeArea(
-            top: false, // SafeArea is only needed for the bottom.
+            top: false,
             child: Row(
               children: [
+                // The button for attaching files.
                 Tooltip(
                   message: 'Attach files',
                   child: IconButton(
@@ -411,13 +485,9 @@ class _ChatUIState extends State<ChatUI> {
                         allowMultiple: true,
                         type: FileType.custom,
                         allowedExtensions: [
-                          // Images
-                          'jpg', 'jpeg', 'png', 'webp',
-                          // Videos
-                          'mp4', 'webm', 'mkv', 'mov',
-                          // Documents
-                          'pdf', 'txt',
-                          // Audio
+                          'jpg', 'jpeg', 'png', 'webp', // Images
+                          'mp4', 'webm', 'mkv', 'mov', // Videos
+                          'pdf', 'txt', // Documents
                           'mp3',
                           'mpga',
                           'wav',
@@ -426,7 +496,7 @@ class _ChatUIState extends State<ChatUI> {
                           'opus',
                           'aac',
                           'flac',
-                          'pcm',
+                          'pcm', // Audio
                         ],
                       );
                       if (result != null) {
@@ -441,9 +511,11 @@ class _ChatUIState extends State<ChatUI> {
 
                 const SizedBox(width: 8),
 
+                // The main text input field.
                 Expanded(
                   child: Focus(
                     onKeyEvent: (FocusNode node, KeyEvent event) {
+                      // Send the message when the user presses Enter without Shift.
                       if (HardwareKeyboard.instance.isLogicalKeyPressed(
                             LogicalKeyboardKey.enter,
                           ) &&
@@ -478,6 +550,7 @@ class _ChatUIState extends State<ChatUI> {
                   ),
                 ),
                 const SizedBox(width: 8.0),
+                // The send/stop button.
                 Tooltip(
                   message: _isLoading ? 'Stop' : 'Send message',
                   child: IconButton(
@@ -495,10 +568,9 @@ class _ChatUIState extends State<ChatUI> {
           ),
         ),
       ],
-      //   ),
-      // ),
     );
 
+    // Center the input area and constrain its width.
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 900),
@@ -508,8 +580,15 @@ class _ChatUIState extends State<ChatUI> {
   }
 }
 
+/// A widget that displays a list of attachments.
+///
+/// This widget is used to show file attachments in the chat input area and
+/// within message bubbles. It supports removing attachments.
 class AttachmentView extends StatefulWidget {
+  /// The list of file paths for the attachments.
   final List<String> attachments;
+
+  /// A callback function that is called when an attachment is removed.
   final Function(int)? onAttachmentRemoved;
 
   const AttachmentView({
@@ -531,23 +610,28 @@ class _AttachmentViewState extends State<AttachmentView> {
     super.dispose();
   }
 
+  /// Returns an appropriate icon for a given file path based on its extension.
   IconData _getIconForFile(String filePath) {
     final extension = p.extension(filePath).toLowerCase();
     switch (extension) {
+      // Image file types
       case '.jpg':
       case '.jpeg':
       case '.png':
       case '.webp':
         return Icons.image_outlined;
+      // Video file types
       case '.mp4':
       case '.webm':
       case '.mkv':
       case '.mov':
         return Icons.movie_outlined;
+      // Document file types
       case '.pdf':
         return Icons.picture_as_pdf_outlined;
       case '.txt':
         return Icons.article_outlined;
+      // Audio file types
       case '.mp3':
       case '.wav':
       case '.m4a':
@@ -557,6 +641,7 @@ class _AttachmentViewState extends State<AttachmentView> {
       case '.pcm':
       case '.mpga':
         return Icons.audiotrack_outlined;
+      // Default icon for other file types
       default:
         return Icons.insert_drive_file_outlined;
     }
@@ -564,12 +649,12 @@ class _AttachmentViewState extends State<AttachmentView> {
 
   @override
   Widget build(BuildContext context) {
-    //final theme = Theme.of(context);
-
+    // If there are no attachments, return an empty box.
     if (widget.attachments.isEmpty) {
       return const SizedBox.shrink();
     }
 
+    // The main container for the attachment view.
     return Container(
       height: 50,
       color: Colors.transparent,
@@ -579,6 +664,7 @@ class _AttachmentViewState extends State<AttachmentView> {
         thumbVisibility: true,
         child: Padding(
           padding: const EdgeInsets.only(bottom: 5),
+          // A horizontal list of attachments.
           child: ListView.builder(
             controller: _scrollController,
             scrollDirection: Axis.horizontal,
@@ -589,16 +675,13 @@ class _AttachmentViewState extends State<AttachmentView> {
               final fileName = p.basenameWithoutExtension(filePath);
               final fileExt = p.extension(filePath);
 
+              // Each attachment is displayed as an InputChip.
               return Padding(
                 padding: const EdgeInsets.only(left: 8.0),
                 child: InputChip(
                   avatar: Icon(_getIconForFile(filePath), size: 18),
-                  // disabledColor: theme.colorScheme.onPrimary,
-                  // labelStyle: widget.onAttachmentRemoved == null ? TextStyle(
-                  //   color: theme.colorScheme.primary,
-                  // ) : null,
                   label: Container(
-                    constraints: BoxConstraints(maxWidth: 120),
+                    constraints: const BoxConstraints(maxWidth: 120),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -606,13 +689,14 @@ class _AttachmentViewState extends State<AttachmentView> {
                           child: Text(
                             fileName,
                             overflow: TextOverflow.fade,
-                            softWrap: false, // good practice with ellipsis
+                            softWrap: false,
                           ),
                         ),
-                        Text(fileExt), // always visible
+                        Text(fileExt),
                       ],
                     ),
                   ),
+                  // Allow deletion if a callback is provided.
                   onDeleted: widget.onAttachmentRemoved != null
                       ? () => widget.onAttachmentRemoved!(index)
                       : null,
@@ -629,11 +713,24 @@ class _AttachmentViewState extends State<AttachmentView> {
   }
 }
 
+/// A widget that displays a single message in the chat.
+///
+/// This widget handles the display of user and AI messages, including attachments,
+/// thinking processes, and action buttons for copying, editing, and regenerating.
 class MessageBubble extends StatefulWidget {
+  /// The message to be displayed.
   final ChatMessage message;
+
+  /// Whether this is the last message from the user.
   final bool isLastUserMessage;
+
+  /// Whether this is the last message from the AI.
   final bool isLastAiMessage;
+
+  /// A callback function that is called when the message is edited.
   final Function(String) onMessageEdited;
+
+  /// A callback function that is called when the user requests to regenerate the message.
   final VoidCallback onRegenerate;
 
   const MessageBubble({
@@ -673,6 +770,7 @@ class _MessageBubbleState extends State<MessageBubble>
     super.dispose();
   }
 
+  // Keep the state of the message bubble alive to preserve animations and state.
   @override
   bool get wantKeepAlive => true;
 
@@ -682,12 +780,14 @@ class _MessageBubbleState extends State<MessageBubble>
     final theme = Theme.of(context);
     final isUser = widget.message.isUser;
 
+    // Truncate long messages for a better user experience.
     final messageText = _isExpanded || !isUser || !_isLongMessage
         ? widget.message.text
         : (widget.message.text.length > _maxLength
               ? '${widget.message.text.substring(0, _maxLength)}...'
               : widget.message.text);
 
+    // Show action buttons on hover or for the last message in the chat.
     final bool shouldShowButtons =
         (isUser && widget.isLastUserMessage) ||
         (!isUser && widget.isLastAiMessage) ||
@@ -697,6 +797,7 @@ class _MessageBubbleState extends State<MessageBubble>
       return _buildEditingView(context);
     }
 
+    // The main message bubble widget.
     Widget messageWidget = MouseRegion(
       onEnter: (_) => setState(() => _isHovering = true),
       onExit: (_) => setState(() => _isHovering = false),
@@ -707,9 +808,11 @@ class _MessageBubbleState extends State<MessageBubble>
               ? CrossAxisAlignment.end
               : CrossAxisAlignment.start,
           children: [
+            // Display attachments if they exist.
             if (widget.message.attachments.isNotEmpty)
               AttachmentView(attachments: widget.message.attachments),
 
+            // The container for the message content.
             Container(
               margin: EdgeInsets.only(
                 top: 4.0,
@@ -752,6 +855,7 @@ class _MessageBubbleState extends State<MessageBubble>
                     ? MainAxisAlignment.spaceBetween
                     : MainAxisAlignment.start,
                 children: [
+                  // Action bar for AI messages.
                   if (!isUser) ...[
                     AnimatedOpacity(
                       opacity: shouldShowButtons ? 1.0 : 0.0,
@@ -760,15 +864,17 @@ class _MessageBubbleState extends State<MessageBubble>
                     ),
                     const SizedBox(width: 8.0),
                   ],
+                  // The main content of the message.
                   Flexible(
                     child: Column(
                       spacing: 8,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Display the thinking process if it exists.
                         if (!isUser && widget.message.thinkingProcess != null)
                           _buildThinkingProcess(context),
+                        // The message text, rendered as Markdown.
                         SelectionArea(
-                          //focusNode: FocusNode(),
                           selectionControls: materialTextSelectionControls,
                           child: GptMarkdown(
                             messageText,
@@ -776,9 +882,6 @@ class _MessageBubbleState extends State<MessageBubble>
                               color: isUser
                                   ? theme.colorScheme.onPrimaryContainer
                                   : theme.colorScheme.onSurface,
-                              // fontWeight: isUser ? FontWeight.w500 : null,
-                              // letterSpacing: isUser ? 0 : null,
-                              // wordSpacing: isUser ? 1.5 : null,
                             ),
                             codeBuilder: (context, name, code, closed) {
                               return CodeBlock(
@@ -796,6 +899,7 @@ class _MessageBubbleState extends State<MessageBubble>
                     ),
                   ),
                   if (isUser) const SizedBox(width: 8.0),
+                  // Action bar for user messages.
                   if (isUser)
                     AnimatedOpacity(
                       opacity: shouldShowButtons ? 1.0 : 0.0,
@@ -810,6 +914,7 @@ class _MessageBubbleState extends State<MessageBubble>
       ),
     );
 
+    // Animate the message bubble when it first appears.
     if (!_hasAnimated) {
       messageWidget = messageWidget
           .animate(
@@ -819,21 +924,21 @@ class _MessageBubbleState extends State<MessageBubble>
               });
             },
           )
-          .fadeIn(duration: 500.ms)
-          .slideY(begin: 0.5);
+          .fadeIn(duration: 500.ms);
     }
 
     return messageWidget;
   }
 
+  /// Builds the widget that displays the AI's thinking process.
   Widget _buildThinkingProcess(BuildContext context) {
     final theme = Theme.of(context);
     return Theme(
       data: theme.copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
         backgroundColor: theme.colorScheme.surfaceContainerHigh,
-        tilePadding: EdgeInsets.symmetric(horizontal: 10),
-        childrenPadding: EdgeInsets.all(10),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 10),
+        childrenPadding: const EdgeInsets.all(10),
         title: Text(
           'Thinking Summary',
           style: theme.textTheme.bodySmall?.copyWith(
@@ -860,6 +965,7 @@ class _MessageBubbleState extends State<MessageBubble>
     );
   }
 
+  /// Builds the action bar with buttons for copying, editing, etc.
   Widget _buildActionBar(BuildContext context, bool isUser) {
     final theme = Theme.of(context);
     final onPrimaryContainer = theme.colorScheme.onPrimaryContainer;
@@ -868,6 +974,7 @@ class _MessageBubbleState extends State<MessageBubble>
       mainAxisSize: MainAxisSize.min,
       children: isUser
           ? [
+              // Expand/collapse button for long messages.
               if (_isLongMessage)
                 Tooltip(
                   message: _isExpanded ? 'Collapse' : 'Expand',
@@ -878,6 +985,7 @@ class _MessageBubbleState extends State<MessageBubble>
                     color: onPrimaryContainer,
                   ),
                 ),
+              // Copy button.
               Tooltip(
                 message: 'Copy',
                 child: _buildIconButton(context, Icons.copy_all_outlined, () {
@@ -885,6 +993,7 @@ class _MessageBubbleState extends State<MessageBubble>
                   showCopiedToast(context, theme.colorScheme);
                 }, color: onPrimaryContainer),
               ),
+              // Edit button.
               Tooltip(
                 message: 'Edit',
                 child: _buildIconButton(context, Icons.edit_outlined, () {
@@ -895,6 +1004,7 @@ class _MessageBubbleState extends State<MessageBubble>
               ),
             ]
           : [
+              // Copy button for AI messages.
               Tooltip(
                 message: 'Copy',
                 child: _buildIconButton(context, Icons.copy_all_outlined, () {
@@ -902,6 +1012,7 @@ class _MessageBubbleState extends State<MessageBubble>
                   showCopiedToast(context, theme.colorScheme);
                 }),
               ),
+              // Regenerate button for AI messages.
               Tooltip(
                 message: 'Regenerate',
                 child: _buildIconButton(
@@ -914,6 +1025,7 @@ class _MessageBubbleState extends State<MessageBubble>
     );
   }
 
+  /// A helper method for building icon buttons in the action bar.
   Widget _buildIconButton(
     BuildContext context,
     IconData icon,
@@ -930,6 +1042,7 @@ class _MessageBubbleState extends State<MessageBubble>
     );
   }
 
+  /// Builds the view for editing a message.
   Widget _buildEditingView(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
@@ -941,6 +1054,7 @@ class _MessageBubbleState extends State<MessageBubble>
       ),
       child: Column(
         children: [
+          // The text field for editing the message.
           TextField(
             controller: _editingController,
             autofocus: true,
@@ -951,6 +1065,7 @@ class _MessageBubbleState extends State<MessageBubble>
             ),
           ),
           const SizedBox(height: 8.0),
+          // Action buttons for saving or cancelling the edit.
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [

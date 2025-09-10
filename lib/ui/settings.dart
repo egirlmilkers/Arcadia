@@ -8,9 +8,11 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/logging.dart';
 import '../theme/manager.dart';
 import '../util.dart';
 
+/// A page for displaying and managing application settings.
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
@@ -31,6 +33,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _loadApiKey();
   }
 
+  /// Loads the Gemini API key from shared preferences.
   Future<void> _loadApiKey() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -38,20 +41,24 @@ class _SettingsPageState extends State<SettingsPage> {
     });
   }
 
+  /// Saves the Gemini API key to shared preferences.
   Future<void> _saveApiKey(String apiKey) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('gemini_api_key', apiKey);
     setState(() {
       _apiKey = apiKey;
     });
+    Logging().info('Saved new API key.');
   }
 
-  // get the version from the package info
+  /// Initializes the application information, such as version and platform details.
   Future<void> _initAppInfo() async {
     final packageInfo = await PackageInfo.fromPlatform();
     final platform = await _getPlatformInfo();
 
-    if (!kIsWeb && Platform.isAndroid) _dynamicColorLabel = 'Material You';
+    if (!kIsWeb && Platform.isAndroid) {
+      _dynamicColorLabel = 'Material You';
+    }
 
     if (mounted) {
       setState(() {
@@ -61,6 +68,7 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  /// Returns a string representing the current platform and its version.
   Future<String> _getPlatformInfo() async {
     if (kIsWeb) return 'Web';
 
@@ -82,13 +90,14 @@ class _SettingsPageState extends State<SettingsPage> {
         final linuxInfo = await deviceInfo.linuxInfo;
         return 'Linux (${linuxInfo.prettyName})';
       }
-    } catch (e) {
+    } catch (e, s) {
+      Logging().error('Failed to get platform info', e, s);
       return 'Platform Unknown';
     }
     return 'Unsupported Platform';
   }
 
-  // FIX: Updated dialog to use the new RadioGroup widget
+  /// Shows a dialog for selecting an option from a list.
   void _showOptionSelectDialog<T>({
     required BuildContext context,
     required String title,
@@ -101,7 +110,6 @@ class _SettingsPageState extends State<SettingsPage> {
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
-        // Use StatefulBuilder to manage the temporary selection state within the dialog
         return StatefulBuilder(
           builder: (context, setState) {
             T? currentSelection = selection;
@@ -109,7 +117,7 @@ class _SettingsPageState extends State<SettingsPage> {
               title: Column(
                 children: [
                   if (icon != null) Icon(icon, size: 24),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
                     title,
                     style: Theme.of(context).textTheme.headlineMedium,
@@ -118,12 +126,9 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               content: SizedBox(
                 width: double.minPositive,
-                // The new RadioGroup widget handles the state for its children
                 child: RadioGroup<T>(
                   groupValue: currentSelection,
                   onChanged: (T? value) {
-                    // When an option is tapped, this callback is fired.
-                    // We immediately apply the change and close the dialog.
                     if (value != null) {
                       onSelected(value);
                       Navigator.of(dialogContext).pop();
@@ -134,7 +139,6 @@ class _SettingsPageState extends State<SettingsPage> {
                     itemCount: options.length,
                     itemBuilder: (context, index) {
                       final option = options[index];
-                      // RadioListTile no longer needs groupValue or onChanged
                       return RadioListTile<T>(
                         title: Text(optionLabelBuilder(option)),
                         value: option,
@@ -156,13 +160,14 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  /// Shows a dialog for setting the Gemini API key.
   void _showApiKeyDialog() {
     final controller = TextEditingController();
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Set API Key'),
+          title: const Text('Set API Key'),
           content: SizedBox(
             width: 300,
             child: TextField(
@@ -170,7 +175,7 @@ class _SettingsPageState extends State<SettingsPage> {
               obscureText: true,
               maxLines: 1,
               autofocus: true,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 hintText: 'Enter your Gemini API Key',
               ),
             ),
@@ -178,14 +183,14 @@ class _SettingsPageState extends State<SettingsPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancel'),
+              child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () {
                 _saveApiKey(controller.text);
                 Navigator.of(context).pop();
               },
-              child: Text('Save'),
+              child: const Text('Save'),
             ),
           ],
         );
@@ -200,6 +205,7 @@ class _SettingsPageState extends State<SettingsPage> {
         final bool customStyleAllowed = !themeManager.useDynamicColor;
 
         return Scaffold(
+          // The app bar for the settings page.
           appBar: AppBar(
             title: const Text(
               'Settings',
@@ -209,15 +215,17 @@ class _SettingsPageState extends State<SettingsPage> {
               context,
             ).colorScheme.surfaceContainerLowest,
           ),
+          // The main body of the settings page.
           body: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 800),
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 children: [
-                  // Theme section
-                  SettingsHeader('Appearance'),
+                  // The "Appearance" section.
+                  const SettingsHeader('Appearance'),
 
+                  // The setting for the app theme.
                   SettingsListTile(
                     title: 'App theme',
                     subtitle: themeManager.themeMode.name.capitalize(),
@@ -232,6 +240,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                   ),
 
+                  // The setting for the color style.
                   SettingsListTile(
                     title: 'Style',
                     subtitle: themeManager.selectedTheme,
@@ -247,6 +256,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     enabled: customStyleAllowed,
                   ),
 
+                  // The setting for the contrast level.
                   ListTile(
                     title: const Text('Contrast level'),
                     enabled: customStyleAllowed,
@@ -273,6 +283,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                   ),
 
+                  // The setting for dynamic color.
                   SwitchListTile(
                     title: Text(_dynamicColorLabel),
                     subtitle: const Text(
@@ -286,7 +297,9 @@ class _SettingsPageState extends State<SettingsPage> {
 
                   const Divider(height: 24),
 
-                  SettingsHeader('API'),
+                  // The "API" section.
+                  const SettingsHeader('API'),
+                  // The setting for the Gemini API key.
                   SettingsListTile(
                     title: 'Gemini API Key',
                     subtitle: _apiKey != null && _apiKey!.length > 4
@@ -297,7 +310,9 @@ class _SettingsPageState extends State<SettingsPage> {
 
                   const Divider(height: 24),
 
-                  SettingsHeader('About'),
+                  // The "About" section.
+                  const SettingsHeader('About'),
+                  // The version and platform information.
                   SettingsListTile(title: 'Version', subtitle: _version),
                   SettingsListTile(title: 'Platform', subtitle: _platformInfo),
 
@@ -312,8 +327,9 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 }
 
-// custom widgets
+/// A custom header widget for settings sections.
 class SettingsHeader extends StatelessWidget {
+  /// The title of the header.
   final String title;
   const SettingsHeader(this.title, {super.key});
   @override
@@ -331,10 +347,18 @@ class SettingsHeader extends StatelessWidget {
   }
 }
 
+/// A custom list tile widget for settings items.
 class SettingsListTile extends StatelessWidget {
+  /// The title of the list tile.
   final String title;
+
+  /// The subtitle of the list tile.
   final String subtitle;
+
+  /// A callback function that is called when the tile is tapped.
   final VoidCallback? onTap;
+
+  /// Whether the tile is enabled.
   final bool enabled;
 
   const SettingsListTile({
@@ -348,12 +372,10 @@ class SettingsListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      title: Text(
-        title,
-        style: TextStyle(fontWeight: FontWeight.w500),
-      ),
-      subtitle: Text(subtitle,
-        style: TextStyle(fontWeight: FontWeight.w300),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(fontWeight: FontWeight.w300),
       ),
       onTap: onTap,
       enabled: enabled,

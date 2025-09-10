@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
+/// A widget that displays a spinning gradient circle and a "Thinking..." message.
+///
+/// This widget is used to indicate that the application is processing a request.
 class ThinkingSpinner extends StatefulWidget {
+  /// The text to display next to the spinner.
   final String text;
 
   const ThinkingSpinner({super.key, this.text = "Thinking..."});
@@ -38,6 +42,7 @@ class _ThinkingSpinnerState extends State<ThinkingSpinner>
     return Row(
       mainAxisAlignment: MainAxisAlignment.start,
       children: [
+        // The rotating gradient circle.
         RotationTransition(
           turns: _controller,
           child: CustomPaint(
@@ -50,13 +55,16 @@ class _ThinkingSpinnerState extends State<ThinkingSpinner>
           ),
         ),
         const SizedBox(width: 8),
+        // The "Thinking..." text.
         Text(widget.text, style: theme.textTheme.bodyLarge),
       ],
     );
   }
 }
 
+/// A custom painter that draws a circle with a gradient border.
 class GradientCirclePainter extends CustomPainter {
+  /// The list of colors to use for the gradient.
   final List<Color> gradientColors;
 
   GradientCirclePainter({required this.gradientColors});
@@ -85,7 +93,9 @@ class GradientCirclePainter extends CustomPainter {
   }
 }
 
+/// A theme extension for providing a list of gradient colors.
 class ThemeGradient extends ThemeExtension<ThemeGradient> {
+  /// The list of colors for the gradient.
   final List<Color> gradientColors;
 
   ThemeGradient({required this.gradientColors});
@@ -104,10 +114,7 @@ class ThemeGradient extends ThemeExtension<ThemeGradient> {
       return this;
     }
     return ThemeGradient(
-      gradientColors: [
-        for (var i = 0; i < gradientColors.length; i++)
-          Color.lerp(gradientColors[i], other.gradientColors[i], t)!,
-      ],
+      gradientColors: gradientColors,
     );
   }
 }

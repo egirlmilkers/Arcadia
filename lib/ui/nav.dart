@@ -5,17 +5,40 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../main.dart';
 import 'settings.dart';
 
+/// A side navigation bar that displays a list of chat sessions and provides
+/// actions for managing them.
 class SideNav extends StatefulWidget {
+  /// A callback function that is called when the user creates a new chat.
   final VoidCallback onNewChat;
+
+  /// Whether the navigation bar is expanded.
   final bool isExpanded;
+
+  /// Whether the navigation bar is pinned open.
   final bool isPinned;
+
+  /// A callback function that is called when the user toggles the pin state.
   final VoidCallback onToggle;
+
+  /// The list of chat sessions to display.
   final List<ChatSession> chatList;
+
+  /// A callback function that is called when the user selects a chat.
   final Function(ChatSession) onChatSelected;
+
+  /// A callback function that is called when the user deletes a chat.
   final Function(ChatSession) onDeleteChat;
+
+  /// A callback function that is called when the user archives a chat.
   final Function(ChatSession) onArchiveChat;
+
+  /// A callback function that is called when the user renames a chat.
   final Function(ChatSession, String) onRenameChat;
+
+  /// A callback function that is called when the user exports a chat.
   final Function(ChatSession) onExportChat;
+
+  /// The currently selected chat session.
   final ChatSession? selectedChat;
 
   const SideNav({
@@ -38,6 +61,7 @@ class SideNav extends StatefulWidget {
 }
 
 class _SideNavState extends State<SideNav> {
+  /// Shows a dialog for renaming a chat session.
   void _showRenameDialog(ChatSession chat) {
     final controller = TextEditingController(text: chat.title);
     showDialog(
@@ -50,8 +74,7 @@ class _SideNavState extends State<SideNav> {
             child: TextField(
               controller: controller,
               autofocus: true,
-              maxLines: 1, // prevents wrapping
-              // allows use of pressing enter
+              maxLines: 1,
               onSubmitted: (value) {
                 widget.onRenameChat(chat, controller.text);
                 Navigator.of(context).pop();
@@ -80,11 +103,13 @@ class _SideNavState extends State<SideNav> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    // The main container for the side navigation bar.
     return AnimatedContainer(
       duration: 200.ms,
       width: widget.isExpanded ? 280 : 74,
       color: theme.colorScheme.surfaceContainerLowest,
       child: ClipRect(
+        // Use an OverflowBox to ensure the content doesn't get clipped during animation.
         child: OverflowBox(
           minWidth: 280,
           maxWidth: 280,
@@ -97,6 +122,7 @@ class _SideNavState extends State<SideNav> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // The button for pinning the sidebar.
                 IconButton(
                   icon: AnimatedRotation(
                     duration: 200.ms,
@@ -110,6 +136,7 @@ class _SideNavState extends State<SideNav> {
                   onPressed: widget.onToggle,
                 ),
                 const SizedBox(height: 10),
+                // The button for creating a new chat.
                 CustomNavButton(
                   isExpanded: widget.isExpanded,
                   onPressed: widget.onNewChat,
@@ -118,6 +145,7 @@ class _SideNavState extends State<SideNav> {
                   backgroundColor: theme.colorScheme.tertiaryContainer,
                   foregroundColor: theme.colorScheme.onTertiaryContainer,
                 ),
+                // The list of recent chats, which is only visible when expanded.
                 if (widget.isExpanded) ...[
                   const SizedBox(height: 20),
                   Padding(
@@ -151,12 +179,14 @@ class _SideNavState extends State<SideNav> {
                 ] else ...[
                   const Spacer(),
                 ],
+                // A divider to separate the main content from the settings button.
                 Container(
                   margin: const EdgeInsets.symmetric(vertical: 8.0),
                   height: 1,
                   width: widget.isExpanded ? 280 - 32 : 80 - 32,
                   color: theme.dividerColor,
                 ),
+                // The button for opening the settings page.
                 CustomNavButton(
                   isExpanded: widget.isExpanded,
                   onPressed: () {
@@ -179,13 +209,27 @@ class _SideNavState extends State<SideNav> {
   }
 }
 
+/// A list tile that represents a single chat session in the side navigation.
 class ChatListTile extends StatefulWidget {
+  /// The chat session to display.
   final ChatSession chat;
+
+  /// Whether the tile is currently selected.
   final bool isSelected;
+
+  /// A callback function that is called when the tile is tapped.
   final VoidCallback onTap;
+
+  /// A callback function that is called when the user chooses to rename the chat.
   final VoidCallback onRename;
+
+  /// A callback function that is called when the user chooses to archive the chat.
   final VoidCallback onArchive;
+
+  /// A callback function that is called when the user chooses to delete the chat.
   final VoidCallback onDelete;
+
+  /// A callback function that is called when the user chooses to export the chat.
   final VoidCallback onExport;
 
   const ChatListTile({
@@ -216,6 +260,7 @@ class _ChatListTileState extends State<ChatListTile> {
         : null;
     final Color? fgColor = widget.isSelected ? theme.colorScheme.primary : null;
 
+    // Use a MouseRegion to detect when the user is hovering over the tile.
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovering = true),
       onExit: (_) => setState(() => _isHovering = false),
@@ -223,7 +268,9 @@ class _ChatListTileState extends State<ChatListTile> {
         leading: const Icon(Icons.chat_bubble_rounded, size: 18),
         title: Text(
           widget.chat.title,
-          style: TextStyle(fontVariations: [FontVariation('wght', 500.0)]),
+          style: const TextStyle(
+            fontVariations: [FontVariation('wght', 500.0)],
+          ),
         ),
         onTap: widget.onTap,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -232,6 +279,7 @@ class _ChatListTileState extends State<ChatListTile> {
         selectedTileColor: theme.colorScheme.onPrimary,
         horizontalTitleGap: 8,
         contentPadding: const EdgeInsets.only(left: 16, right: 8),
+        // The popup menu button for chat actions.
         trailing: AnimatedOpacity(
           opacity: showPopupMenu ? 1.0 : 0.0,
           duration: 200.ms,
@@ -255,37 +303,41 @@ class _ChatListTileState extends State<ChatListTile> {
               }
             },
             itemBuilder: (context) => [
+              // The "Rename" menu item.
               PopupMenuItem(
                 value: 'rename',
                 child: Row(
                   spacing: 12,
                   children: <Widget>[
-                    Icon(Icons.drive_file_rename_outline),
+                    const Icon(Icons.drive_file_rename_outline),
                     Text('Rename', style: TextStyle(color: fgColor)),
                   ],
                 ),
               ),
+              // The "Archive" menu item.
               PopupMenuItem(
                 value: 'archive',
                 child: Row(
                   spacing: 12,
                   children: <Widget>[
-                    Icon(Icons.archive_outlined),
+                    const Icon(Icons.archive_outlined),
                     Text('Archive', style: TextStyle(color: fgColor)),
                   ],
                 ),
               ),
+              // The "Delete" menu item.
               PopupMenuItem(
                 value: 'delete',
                 child: Row(
                   spacing: 12,
                   children: <Widget>[
-                    Icon(Icons.delete_outline),
+                    const Icon(Icons.delete_outline),
                     Text('Delete', style: TextStyle(color: fgColor)),
                   ],
                 ),
               ),
               const PopupMenuDivider(height: 3, indent: 10, endIndent: 10),
+              // The "Export" menu item.
               PopupMenuItem(
                 value: 'export',
                 child: Row(
@@ -304,12 +356,24 @@ class _ChatListTileState extends State<ChatListTile> {
   }
 }
 
+/// A custom navigation button used in the side navigation bar.
 class CustomNavButton extends StatelessWidget {
+  /// Whether the button is in an expanded state.
   final bool isExpanded;
+
+  /// A callback function that is called when the button is pressed.
   final VoidCallback onPressed;
+
+  /// The icon to display on the button.
   final IconData icon;
+
+  /// The label to display on the button when it is expanded.
   final String label;
+
+  /// The background color of the button.
   final Color? backgroundColor;
+
+  /// The foreground color of the button.
   final Color? foregroundColor;
 
   const CustomNavButton({
@@ -342,7 +406,9 @@ class CustomNavButton extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               label,
-              style: TextStyle(fontVariations: [FontVariation('wght', 550.0)]),
+              style: const TextStyle(
+                fontVariations: [FontVariation('wght', 550.0)],
+              ),
             ),
           ],
         ],

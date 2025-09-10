@@ -5,6 +5,10 @@ import 'package:provider/provider.dart';
 
 import '../theme/manager.dart';
 
+/// A widget that displays the welcome screen when there is no active chat.
+///
+/// This widget shows a greeting message and a few suggestion cards to help
+/// the user get started.
 class WelcomeUI extends StatelessWidget {
   const WelcomeUI({super.key});
 
@@ -24,6 +28,7 @@ class WelcomeUI extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            // The main greeting message with a gradient effect.
             ShaderMask(
                   shaderCallback: (bounds) => LinearGradient(
                     colors: gradientColors,
@@ -42,6 +47,7 @@ class WelcomeUI extends StatelessWidget {
                 .animate()
                 .fadeIn(delay: 200.ms, duration: 500.ms)
                 .slideY(begin: 0.2),
+            // The secondary greeting message.
             Text(
               "How can I help you today?",
               style: theme.textTheme.headlineLarge?.copyWith(
@@ -49,30 +55,31 @@ class WelcomeUI extends StatelessWidget {
               ),
             ).animate().fadeIn(delay: 400.ms, duration: 500.ms),
             const SizedBox(height: 40),
+            // The row of suggestion cards.
             Row(
                   children: [
-                    Expanded(
+                    const Expanded(
                       child: SuggestionCard(
                         icon: Icons.code,
                         text: "Help me code",
                       ),
                     ),
                     const SizedBox(width: 16),
-                    Expanded(
+                    const Expanded(
                       child: SuggestionCard(
                         icon: Icons.edit,
                         text: "Help me write",
                       ),
                     ),
                     const SizedBox(width: 16),
-                    Expanded(
+                    const Expanded(
                       child: SuggestionCard(
                         icon: Icons.lightbulb_outline,
                         text: "Give me ideas",
                       ),
                     ),
                     const SizedBox(width: 16),
-                    Expanded(
+                    const Expanded(
                       child: SuggestionCard(
                         icon: Icons.flight_takeoff,
                         text: "Help me plan",
@@ -90,8 +97,12 @@ class WelcomeUI extends StatelessWidget {
   }
 }
 
+/// A card that displays a suggestion for what the user can do with the app.
 class SuggestionCard extends StatelessWidget {
+  /// The icon to display on the card.
   final IconData icon;
+
+  /// The text to display on the card.
   final String text;
   const SuggestionCard({super.key, required this.icon, required this.text});
 
@@ -107,8 +118,10 @@ class SuggestionCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // The icon for the suggestion.
             Icon(icon, size: 28),
             const SizedBox(height: 12),
+            // The text for the suggestion.
             Text(text, style: theme.textTheme.bodyMedium),
           ],
         ),
