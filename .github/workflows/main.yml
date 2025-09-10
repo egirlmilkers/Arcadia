@@ -61,7 +61,7 @@ jobs:
 
       - name: Zip the build artifacts
         run: |
-          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath "Arcadia-${{ steps.version.outputs.full_version }}.zip"
+          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath "Arcadia-win64-${{ steps.version.outputs.full_version }}.zip"
         shell: pwsh
 
       - name: Create or Update Release
@@ -71,4 +71,4 @@ jobs:
           automatic_release_tag: "${{ steps.version.outputs.base_version }}"
           prerelease: ${{ steps.version.outputs.is_prerelease }}
           title: "Arcadia ${{ steps.version.outputs.release_title_version }}"
-          files: "Arcadia-x64-${{ steps.version.outputs.full_version }}.zip"
+          files: "Arcadia-win64-${{ steps.version.outputs.full_version }}.zip"

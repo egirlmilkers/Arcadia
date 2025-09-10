@@ -372,7 +372,7 @@ class _MainUIState extends State<MainUI> {
                   Expanded(
                     // An animated switcher to transition between the welcome screen and the chat UI.
                     child: AnimatedSwitcher(
-                      duration: 500.ms,
+                      duration: 200.ms,
                       transitionBuilder:
                           (Widget child, Animation<double> animation) {
                             return FadeTransition(

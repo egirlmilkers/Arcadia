@@ -38,7 +38,6 @@ void main() async {
 // - transparency doesnt work
 // - scrolling to bottom of chat
 
-// - github autobuild
 // - web version
 // - raem theme
 

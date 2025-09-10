@@ -60,13 +60,14 @@ class _ChatUIState extends State<ChatUI> {
   bool _isLoading = false;
   GeminiService? _geminiService;
   List<PlatformFile> _attachments = [];
-  //bool _isScrolling = false; // Add this line
 
-  // @override
-  // void initState() {
-  //   super.initState();
-  //   _
-  // }
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(milliseconds: 300), () {
+      _scrollToBottom();
+    });
+  }
 
   @override
   void dispose() {
@@ -350,12 +351,14 @@ class _ChatUIState extends State<ChatUI> {
   /// Scrolls the chat to the bottom.
   ///
   /// This is typically called after a new message is added to the chat.
-  void _scrollToBottom({int duration = 300}) {
+  void _scrollToBottom({int? duration}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: Duration(milliseconds: duration),
+          duration: Duration(
+            milliseconds: duration ?? (_scrollController.position.maxScrollExtent / 10).toInt(),
+          ),
           curve: Curves.easeOut,
         );
       }
@@ -375,13 +378,11 @@ class _ChatUIState extends State<ChatUI> {
               if (event is PointerScrollEvent) {
                 if (_scrollController.hasClients) {
                   _scrollController.jumpTo(
-                    // clampDouble(
+                    clampDouble(
                       _scrollController.offset + event.scrollDelta.dy,
-                    //   0,
-                    //   _scrollController.offset,
-                    // ),
-                    // duration: 100.ms,
-                    // curve: Curves.easeInOut
+                      0,
+                      _scrollController.position.maxScrollExtent,
+                    ),
                   );
                 }
               }
@@ -392,46 +393,66 @@ class _ChatUIState extends State<ChatUI> {
                 : Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 900),
-                      // A list view of all the messages in the chat session.
-                      child: ListView.separated(
+                      // A scrollable column of all messages in the chat session.
+                      child: SingleChildScrollView(
                         controller: _scrollController,
+                        physics: const ClampingScrollPhysics(),
                         padding: const EdgeInsets.all(16.0),
-                        itemCount: widget.chatSession.messages.length,
-                        itemBuilder: (context, index) {
-                          final message = widget.chatSession.messages[index];
-                          // Determine if the message is the last one from the user or AI.
-                          final lastUserMessageIndex = widget
-                              .chatSession
-                              .messages
-                              .lastIndexWhere((m) => m.isUser);
-                          final lastAiMessageIndex = widget.chatSession.messages
-                              .lastIndexWhere((m) => !m.isUser);
+                        child: Column(
+                          children: [
+                            for (
+                              int index = 0;
+                              index < widget.chatSession.messages.length;
+                              index++
+                            ) ...[
+                              Builder(
+                                builder: (context) {
+                                  final message =
+                                      widget.chatSession.messages[index];
+                                  // Determine if the message is the last one from the user or AI.
+                                  final lastUserMessageIndex = widget
+                                      .chatSession
+                                      .messages
+                                      .lastIndexWhere((m) => m.isUser);
+                                  final lastAiMessageIndex = widget
+                                      .chatSession
+                                      .messages
+                                      .lastIndexWhere((m) => !m.isUser);
 
-                          final bool isLastUserMessage =
-                              index == lastUserMessageIndex;
-                          final bool isLastAiMessage =
-                              index == lastAiMessageIndex;
+                                  final bool isLastUserMessage =
+                                      index == lastUserMessageIndex;
+                                  final bool isLastAiMessage =
+                                      index == lastAiMessageIndex;
 
-                          // Each message is displayed in a MessageBubble.
-                          return MessageBubble(
-                            message: message,
-                            isLastUserMessage: isLastUserMessage,
-                            isLastAiMessage: isLastAiMessage,
-                            onMessageEdited: (newText) {
-                              setState(() {
-                                widget.chatSession.messages[index].text =
-                                    newText;
-                              });
-                              _chatHistoryService.saveChat(widget.chatSession);
-                            },
-                            onRegenerate: () {
-                              _regenerateResponse(index);
-                            },
-                          );
-                        },
-                        separatorBuilder: (context, index) {
-                          return const SizedBox(height: 20);
-                        },
+                                  // Each message is displayed in a MessageBubble.
+                                  return MessageBubble(
+                                    message: message,
+                                    isLastUserMessage: isLastUserMessage,
+                                    isLastAiMessage: isLastAiMessage,
+                                    onMessageEdited: (newText) {
+                                      setState(() {
+                                        widget
+                                                .chatSession
+                                                .messages[index]
+                                                .text =
+                                            newText;
+                                      });
+                                      _chatHistoryService.saveChat(
+                                        widget.chatSession,
+                                      );
+                                    },
+                                    onRegenerate: () {
+                                      _regenerateResponse(index);
+                                    },
+                                  );
+                                },
+                              ),
+                              if (index <
+                                  widget.chatSession.messages.length - 1)
+                                const SizedBox(height: 20),
+                            ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
