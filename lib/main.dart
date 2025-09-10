@@ -35,8 +35,6 @@ void main() async {
 
 // ========== TODO ==========
 // - thinking dropdown polish
-// - transparency doesnt work
-// - scrolling to bottom of chat
 
 // - web version
 // - raem theme

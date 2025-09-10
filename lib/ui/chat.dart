@@ -3,7 +3,6 @@ import 'dart:ui';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import 'package:file_picker/file_picker.dart';
@@ -357,7 +356,9 @@ class _ChatUIState extends State<ChatUI> {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
           duration: Duration(
-            milliseconds: duration ?? (_scrollController.position.maxScrollExtent / 10).toInt(),
+            milliseconds:
+                duration ??
+                (_scrollController.position.maxScrollExtent / 10).toInt(),
           ),
           curve: Curves.easeOut,
         );
@@ -367,37 +368,40 @@ class _ChatUIState extends State<ChatUI> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Stack(
       children: [
         // The main chat area, which is expandable.
-        Expanded(
-          // A listener to handle scroll events for a smoother experience.
-          child: Listener(
-            behavior: HitTestBehavior.opaque,
-            onPointerSignal: (event) {
-              if (event is PointerScrollEvent) {
-                if (_scrollController.hasClients) {
-                  _scrollController.jumpTo(
-                    clampDouble(
-                      _scrollController.offset + event.scrollDelta.dy,
-                      0,
-                      _scrollController.position.maxScrollExtent,
-                    ),
-                  );
-                }
+        // Expanded(
+        // A listener to handle scroll events for a smoother experience.
+        // child:
+        Listener(
+          behavior: HitTestBehavior.opaque,
+          onPointerSignal: (event) {
+            if (event is PointerScrollEvent) {
+              if (_scrollController.hasClients) {
+                _scrollController.jumpTo(
+                  clampDouble(
+                    _scrollController.offset + event.scrollDelta.dy,
+                    0,
+                    _scrollController.position.maxScrollExtent,
+                  ),
+                );
               }
-            },
-            // If there are no messages, show the welcome UI.
-            child: widget.chatSession.messages.isEmpty
-                ? const WelcomeUI()
-                : Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 900),
-                      // A scrollable column of all messages in the chat session.
+            }
+          },
+          // If there are no messages, show the welcome UI.
+          child: widget.chatSession.messages.isEmpty
+              ? const WelcomeUI()
+              : Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 900),
+                    // A scrollable column of all messages in the chat session.
+                    child: Padding(
+                      padding: EdgeInsetsGeometry.only(bottom: 65),
                       child: SingleChildScrollView(
                         controller: _scrollController,
                         physics: const ClampingScrollPhysics(),
-                        padding: const EdgeInsets.all(16.0),
+                        padding: const EdgeInsets.only(top: 50, left: 16, right: 16, bottom: 25),
                         child: Column(
                           children: [
                             for (
@@ -456,16 +460,17 @@ class _ChatUIState extends State<ChatUI> {
                       ),
                     ),
                   ),
-          ),
+                ),
         ),
+        //),
         // The text input area at the bottom of the screen.
-        _buildTextInputArea(),
+        _buildPromptInputArea(),
       ],
     );
   }
 
   /// Builds the text input area, including the attach button, text field, and send button.
-  Widget _buildTextInputArea() {
+  Widget _buildPromptInputArea() {
     final theme = Theme.of(context);
     final themeManager = Provider.of<ThemeManager>(context, listen: false);
     final themeName = themeManager.selectedTheme;
@@ -486,6 +491,7 @@ class _ChatUIState extends State<ChatUI> {
 
         // The main container for the input controls.
         Container(
+          color: theme.colorScheme.surface,
           padding: EdgeInsets.only(
             bottom: 8,
             left: 4,
@@ -592,7 +598,8 @@ class _ChatUIState extends State<ChatUI> {
     );
 
     // Center the input area and constrain its width.
-    return Center(
+    return Align(
+      alignment: Alignment.bottomCenter,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 900),
         child: inputArea,

@@ -227,6 +227,7 @@ class _MainUIState extends State<MainUI> {
             duration: 200.ms,
             padding: EdgeInsets.only(left: _isPinned ? 280 : 74),
             child: Scaffold(
+              extendBodyBehindAppBar: true,
               backgroundColor: Colors.transparent,
               // The app bar at the top of the screen.
               appBar: AppBar(
@@ -249,6 +250,20 @@ class _MainUIState extends State<MainUI> {
                         fontWeight: FontWeight.w500,
                         color: Colors.white,
                       ),
+                    ),
+                  ),
+                ),
+                // makes a gradient app bar background
+                flexibleSpace: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        theme.colorScheme.surface.withValues(alpha: 1),
+                        theme.colorScheme.surface.withValues(alpha: 0.8),
+                        theme.colorScheme.surface.withValues(alpha: 0)
+                      ],
                     ),
                   ),
                 ),
