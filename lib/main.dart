@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:uuid/uuid.dart';
+import 'package:window_manager/window_manager.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'services/model.dart';
 import 'services/logging.dart';
@@ -12,14 +14,22 @@ import 'theme/manager.dart';
 import 'ui/main.dart';
 import 'util.dart';
 
+String? appVersion;
+
 void main() async {
   // GoogleFonts.config.allowRuntimeFetching = false;
   WidgetsFlutterBinding.ensureInitialized();
+  await windowManager.ensureInitialized();
   await Logging.configure();
+
+  final packageInfo = await PackageInfo.fromPlatform();
+  appVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
 
   if (Platform.isWindows) {
     // fixes clipboard history flutter bug
     WindowsInjector.instance.injectKeyData();
+    
+    WindowManager.instance.setMinimumSize(const Size(640, 480));
   }
 
   runApp(
@@ -35,9 +45,7 @@ void main() async {
 
 // ========== TODO ==========
 // - web version
-// - resizing the window too small breaks it
-// - chat file versions
-// - investigate thinking
+// - refresh data
 
 // ===== Future Updates =====
 // - gemma
@@ -122,8 +130,15 @@ class ChatSession {
   /// The list of messages in the chat session.
   final List<ChatMessage> messages;
 
-  ChatSession({String? id, required this.title, required this.messages})
-    : id = id ?? const Uuid().v4();
+  /// The version of the app that this chat was created in.
+  final String version;
+
+  ChatSession({
+    String? id,
+    required this.title,
+    required this.messages,
+    required this.version,
+  }) : id = id ?? const Uuid().v4();
 
   /// Creates a [ChatSession] from a JSON object.
   factory ChatSession.fromJson(Map<String, dynamic> json) {
@@ -133,6 +148,7 @@ class ChatSession {
       messages: (json['messages'] as List)
           .map((message) => ChatMessage.fromJson(message))
           .toList(),
+      version: json['version'] ?? '1.0.0+1',
     );
   }
 
@@ -142,6 +158,7 @@ class ChatSession {
       'id': id,
       'title': title,
       'messages': messages.map((message) => message.toJson()).toList(),
+      'version': version,
     };
   }
 

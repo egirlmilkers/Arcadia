@@ -87,7 +87,11 @@ class _MainUIState extends State<MainUI> {
   /// Starts a new chat session.
   void _startNewChat() {
     setState(() {
-      _activeChat = ChatSession(title: 'New Chat', messages: []);
+      _activeChat = ChatSession(
+        title: 'New Chat',
+        messages: [],
+        version: appVersion!,
+      );
     });
     Logging().info('Started new chat');
   }
