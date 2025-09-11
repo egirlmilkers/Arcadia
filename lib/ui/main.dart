@@ -34,10 +34,10 @@ class MainUI extends StatefulWidget {
 /// of the side navigation bar.
 class _MainUIState extends State<MainUI> {
   /// The currently active chat session.
-  ChatSession? _activeChat;
+  ArcadiaChat? _activeChat;
 
   /// The list of all chat sessions.
-  List<ChatSession> _chatHistory = [];
+  List<ArcadiaChat> _chatHistory = [];
 
   /// The service for managing chat history.
   final ChatHistoryService _chatHistoryService = ChatHistoryService();
@@ -87,7 +87,7 @@ class _MainUIState extends State<MainUI> {
   /// Starts a new chat session.
   void _startNewChat() {
     setState(() {
-      _activeChat = ChatSession(
+      _activeChat = ArcadiaChat(
         title: 'New Chat',
         messages: [],
         version: appVersion!,
@@ -97,7 +97,7 @@ class _MainUIState extends State<MainUI> {
   }
 
   /// Deletes a chat session.
-  void _deleteChat(ChatSession chat) async {
+  void _deleteChat(ArcadiaChat chat) async {
     if (_activeChat?.id == chat.id) {
       _activeChat = null;
     }
@@ -108,7 +108,7 @@ class _MainUIState extends State<MainUI> {
   }
 
   /// Archives a chat session.
-  void _archiveChat(ChatSession chat) async {
+  void _archiveChat(ArcadiaChat chat) async {
     if (_activeChat?.id == chat.id) {
       _activeChat = null;
     }
@@ -119,7 +119,7 @@ class _MainUIState extends State<MainUI> {
   }
 
   /// Renames a chat session.
-  void _renameChat(ChatSession chat, String newTitle) async {
+  void _renameChat(ArcadiaChat chat, String newTitle) async {
     final activeChatId = _activeChat?.id;
     await _chatHistoryService.renameChat(chat, newTitle);
     await _loadChatHistory();
@@ -137,7 +137,7 @@ class _MainUIState extends State<MainUI> {
   }
 
   /// Exports a chat session to a JSON file.
-  Future<File?> _exportChat(ChatSession chat) async {
+  Future<File?> _exportChat(ArcadiaChat chat) async {
     final logger = Logging();
     if (await Permission.storage.status.isGranted) {
       final downloadsDir = await getDownloadsDirectory();
@@ -170,7 +170,7 @@ class _MainUIState extends State<MainUI> {
   }
 
   /// Selects a chat session to be the active one.
-  void _selectChat(ChatSession chat) {
+  void _selectChat(ArcadiaChat chat) {
     setState(() {
       _activeChat = chat;
     });

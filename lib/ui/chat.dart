@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 
@@ -10,7 +11,6 @@ import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:toastification/toastification.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -19,8 +19,10 @@ import 'welcome.dart';
 import 'md/code_block.dart';
 import 'md/highlight.dart';
 import '../main.dart';
+import 'package:firebase_ai/firebase_ai.dart';
+import 'package:mime/mime.dart';
+
 import '../services/chat_history.dart';
-import '../services/gemini.dart';
 import '../services/model.dart' as model_service;
 import '../theme/manager.dart';
 import '../util.dart';
@@ -33,7 +35,7 @@ import 'widgets/thinking_spinner.dart';
 /// Gemini API, and displaying the conversation.
 class ChatUI extends StatefulWidget {
   /// The chat session to be displayed.
-  final ChatSession chatSession;
+  final ArcadiaChat chatSession;
 
   /// The name of the selected model for content generation.
   final model_service.Model selectedModel;
@@ -58,7 +60,7 @@ class _ChatUIState extends State<ChatUI> {
   final ChatHistoryService _chatHistoryService = ChatHistoryService();
   final Logging _logger = Logging();
   bool _isLoading = false;
-  GeminiService? _geminiService;
+  StreamSubscription<GenerateContentResponse>? _streamSubscription;
   List<PlatformFile> _attachments = [];
 
   @override
@@ -73,7 +75,7 @@ class _ChatUIState extends State<ChatUI> {
   void dispose() {
     _scrollController.dispose();
     // Cancel any ongoing Gemini service call to prevent memory leaks.
-    _geminiService?.cancel();
+    _streamSubscription?.cancel();
     super.dispose();
   }
 
@@ -84,7 +86,7 @@ class _ChatUIState extends State<ChatUI> {
   /// title generation for new chats.
   void _sendMessage() async {
     final text = _textController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty && _attachments.isEmpty) return;
 
     final originalMessage = text;
     final originalAttachments = List<PlatformFile>.from(_attachments);
@@ -94,17 +96,15 @@ class _ChatUIState extends State<ChatUI> {
       _attachments.clear();
     });
 
-    // Copy attachments to a permanent location to ensure they are not lost.
+    // Copy attachments to a permanent location
     final List<String> attachmentPaths = [];
     if (originalAttachments.isNotEmpty) {
       final docs = await getApplicationDocumentsDirectory();
-      final attachmentsDir = Directory(
-        p.join(docs.path, 'Arcadia', 'attachments'),
-      );
+      final attachmentsDir =
+          Directory(p.join(docs.path, 'Arcadia', 'attachments'));
       if (!await attachmentsDir.exists()) {
         await attachmentsDir.create(recursive: true);
       }
-
       for (final file in originalAttachments) {
         if (file.path != null) {
           final newPath = p.join(attachmentsDir.path, file.name);
@@ -112,12 +112,11 @@ class _ChatUIState extends State<ChatUI> {
           attachmentPaths.add(newPath);
         }
       }
-      _logger.info(
-        'Copied ${attachmentPaths.length} attachments to permanent storage.',
-      );
+      _logger
+          .info('Copied ${attachmentPaths.length} attachments to permanent storage.');
     }
 
-    // Optimistically update the UI with the user's message.
+    // Optimistically update the UI
     setState(() {
       widget.chatSession.messages.add(
         ChatMessage(text: text, isUser: true, attachments: attachmentPaths),
@@ -129,7 +128,6 @@ class _ChatUIState extends State<ChatUI> {
     // A new chat is defined by having only one message from the user.
     final bool isNewChat = widget.chatSession.messages.length == 1;
 
-    // A local function to revert the UI if the message fails to send.
     void revertOptimisticUI() {
       setState(() {
         widget.chatSession.messages.removeLast();
@@ -140,90 +138,103 @@ class _ChatUIState extends State<ChatUI> {
     }
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final apiKey = prefs.getString('gemini_api_key');
-      if (apiKey == null || apiKey.isEmpty) {
-        throw Exception("API key not set. Please set it in settings.");
-      }
+      final model = FirebaseAI.googleAI().generativeModel(
+        model: widget.selectedModel.name,
+        // TODO: Pass safetySettings and generationConfig from the model definition
+      );
 
-      final titleService = GeminiService(apiKey: apiKey);
-      final contentService = GeminiService(apiKey: apiKey);
-      _geminiService = contentService;
+      final titleModel = FirebaseAI.googleAI().generativeModel(
+        model: 'gemini-1.5-flash',
+      );
 
-      Map<String, dynamic> modelResponse;
+      // Generate title for new chats
       if (isNewChat) {
-        // If it's a new chat, generate a title and content concurrently.
-        _logger.info('New chat detected. Generating title and content.');
-        final prompt =
-            'Generate a short, concise title (5 words max) for an ai chat started with this user query:\n\n$originalMessage';
-        final titleFuture = titleService.generateContent(
-          [ChatMessage(text: prompt, isUser: true)],
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
-          thinking: false
-        );
-
-        final contentFuture = contentService.generateContent(
-          widget.chatSession.messages,
-          widget.selectedModel.url,
-          thinking: widget.selectedModel.thinking,
-        );
-
-        final results = await Future.wait([titleFuture, contentFuture]);
-        final newTitleResponse = results[0];
-        modelResponse = results[1];
-
-        if (newTitleResponse['error'] == null) {
+        _logger.info('New chat detected. Generating title.');
+        final titlePrompt =
+            'Generate a short, concise title (5 words max) for an ai chat started with this user query:\n\n$originalMessage\n\n[Please do not provide anything else, just the 5 word title.]';
+        final titleResponse =
+            await titleModel.generateContent([Content.text(titlePrompt)]);
+        if (titleResponse.text != null) {
           setState(() {
-            widget.chatSession.title = newTitleResponse['text']
-                .replaceAll('"', '')
-                .trim();
+            widget.chatSession.title =
+                titleResponse.text!.replaceAll('"', '').trim();
           });
           _logger.info('Generated new chat title: ${widget.chatSession.title}');
+          widget.onNewMessage?.call(widget.chatSession.title);
         } else {
           _logger.warning('Failed to generate chat title.');
         }
-      } else {
-        // If it's an existing chat, just generate content.
-        modelResponse = await contentService.generateContent(
-          widget.chatSession.messages,
-          widget.selectedModel.url,
-          thinking: widget.selectedModel.thinking,
-        );
       }
 
-      // Handle user cancellation.
-      if (modelResponse['text'] == GeminiService.cancelledResponse) {
-        revertOptimisticUI();
-        _logger.info('Message sending cancelled by user.');
-        return;
+      // Construct the full prompt with history and new message
+      final prompt = <Content>[];
+      for (final message in widget.chatSession.messages) {
+        final parts = <Part>[TextPart(message.text)];
+        if (message.attachments.isNotEmpty) {
+          for (final path in message.attachments) {
+            final mimeType = lookupMimeType(path);
+            if (mimeType != null) {
+              final bytes = await File(path).readAsBytes();
+              parts.add(InlineDataPart(mimeType, bytes));
+            }
+          }
+        }
+        prompt.add(Content(message.isUser ? 'user' : 'model', parts));
       }
 
-      // Handle API errors.
-      if (modelResponse['error'] != null) {
-        throw Exception(modelResponse['error']);
-      }
-
-      // On success, update the UI with the model's response.
+      // Add an empty message for the AI response to stream into
       setState(() {
-        widget.chatSession.messages.add(
-          ChatMessage(
-            text: modelResponse['text'],
-            isUser: false,
-            thinkingProcess: modelResponse['thinkingProcess'],
-          ),
-        );
+        widget.chatSession.messages.add(ChatMessage(text: '', isUser: false));
       });
       _scrollToBottom();
 
-      await _chatHistoryService.saveChat(widget.chatSession);
-      if (isNewChat) {
-        widget.onNewMessage?.call(widget.chatSession.title);
-      }
+      final stream = model.generateContentStream(prompt);
+      _streamSubscription = stream.listen(
+        (response) {
+          if (response.text != null) {
+            setState(() {
+              widget.chatSession.messages.last.text += response.text!;
+            });
+            _scrollToBottom(duration: 500);
+          }
+        },
+        onDone: () async {
+          await _chatHistoryService.saveChat(widget.chatSession);
+          setState(() {
+            _isLoading = false;
+          });
+          _logger.info('Message stream finished.');
+        },
+        onError: (e) {
+          revertOptimisticUI();
+          // Remove the empty AI message holder
+          if (widget.chatSession.messages.isNotEmpty &&
+              !widget.chatSession.messages.last.isUser) {
+            widget.chatSession.messages.removeLast();
+          }
+          setState(() {
+            _isLoading = false;
+          });
+          _logger.error('Error in message stream', e);
+          toastification.show(
+            type: ToastificationType.error,
+            style: ToastificationStyle.flatColored,
+            title: const Text("Something went wrong"),
+            description: Text(e.toString()),
+            alignment: Alignment.bottomCenter,
+            padding: const EdgeInsets.only(left: 8, right: 8),
+            autoCloseDuration: const Duration(seconds: 4),
+            borderRadius: BorderRadius.circular(100.0),
+          );
+        },
+        cancelOnError: true,
+      );
     } catch (e, s) {
       revertOptimisticUI();
+      setState(() {
+        _isLoading = false;
+      });
       _logger.error('Error sending message', e, s);
-
-      // Show an error toast to the user.
       toastification.show(
         type: ToastificationType.error,
         style: ToastificationStyle.flatColored,
@@ -232,24 +243,13 @@ class _ChatUIState extends State<ChatUI> {
         alignment: Alignment.bottomCenter,
         padding: const EdgeInsets.only(left: 8, right: 8),
         autoCloseDuration: const Duration(seconds: 4),
-        animationBuilder: (context, animation, alignment, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        borderRadius: BorderRadius.circular(100.0),
-        showProgressBar: true,
-        dragToClose: true,
       );
-    } finally {
-      // Ensure the loading indicator is turned off.
-      setState(() {
-        _isLoading = false;
-      });
     }
   }
 
   /// Stops the currently streaming message generation.
   void _stopMessage() {
-    _geminiService?.cancel();
+    _streamSubscription?.cancel();
     setState(() {
       _isLoading = false;
     });
@@ -271,8 +271,6 @@ class _ChatUIState extends State<ChatUI> {
         padding: const EdgeInsets.only(left: 8, right: 8),
         autoCloseDuration: const Duration(seconds: 4),
         borderRadius: BorderRadius.circular(100.0),
-        showProgressBar: true,
-        dragToClose: true,
       );
       return;
     }
@@ -289,48 +287,75 @@ class _ChatUIState extends State<ChatUI> {
     _logger.info('Regenerating response for message at index $messageIndex.');
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final apiKey = prefs.getString('gemini_api_key');
-      if (apiKey == null || apiKey.isEmpty) {
-        throw Exception("API key not set. Please set it in settings.");
-      }
-
-      final contentService = GeminiService(apiKey: apiKey);
-      _geminiService = contentService;
-
-      final modelResponse = await contentService.generateContent(
-        widget.chatSession.messages,
-        widget.selectedModel.url,
-        thinking: widget.selectedModel.thinking,
+      final model = FirebaseAI.googleAI().generativeModel(
+        model: widget.selectedModel.name,
       );
 
-      // Handle user cancellation.
-      if (modelResponse['text'] == GeminiService.cancelledResponse) {
-        _logger.info('Response regeneration cancelled by user.');
-        return;
+      final prompt = <Content>[];
+      for (final message in widget.chatSession.messages) {
+        final parts = <Part>[TextPart(message.text)];
+        if (message.attachments.isNotEmpty) {
+          for (final path in message.attachments) {
+            final mimeType = lookupMimeType(path);
+            if (mimeType != null) {
+              final bytes = await File(path).readAsBytes();
+              parts.add(InlineDataPart(mimeType, bytes));
+            }
+          }
+        }
+        prompt.add(Content(message.isUser ? 'user' : 'model', parts));
       }
 
-      // Handle API errors.
-      if (modelResponse['error'] != null) {
-        throw Exception(modelResponse['error']);
-      }
-
-      // On success, update the UI with the new response.
       setState(() {
-        widget.chatSession.messages.add(
-          ChatMessage(
-            text: modelResponse['text'],
-            isUser: false,
-            thinkingProcess: modelResponse['thinkingProcess'],
-          ),
-        );
+        widget.chatSession.messages.add(ChatMessage(text: '', isUser: false));
       });
       _scrollToBottom();
 
-      await _chatHistoryService.saveChat(widget.chatSession);
+      final stream = model.generateContentStream(prompt);
+      _streamSubscription = stream.listen(
+        (response) {
+          if (response.text != null) {
+            setState(() {
+              widget.chatSession.messages.last.text += response.text!;
+            });
+            _scrollToBottom(duration: 500);
+          }
+        },
+        onDone: () async {
+          await _chatHistoryService.saveChat(widget.chatSession);
+          setState(() {
+            _isLoading = false;
+          });
+          _logger.info('Message stream finished.');
+        },
+        onError: (e) {
+          // Don't revert optimistic UI here, just remove the empty message
+          if (widget.chatSession.messages.isNotEmpty &&
+              !widget.chatSession.messages.last.isUser) {
+            widget.chatSession.messages.removeLast();
+          }
+          setState(() {
+            _isLoading = false;
+          });
+          _logger.error('Error in message stream', e);
+          toastification.show(
+            type: ToastificationType.error,
+            style: ToastificationStyle.flatColored,
+            title: const Text("Something went wrong"),
+            description: Text(e.toString()),
+            alignment: Alignment.bottomCenter,
+            padding: const EdgeInsets.only(left: 8, right: 8),
+            autoCloseDuration: const Duration(seconds: 4),
+            borderRadius: BorderRadius.circular(100.0),
+          );
+        },
+        cancelOnError: true,
+      );
     } catch (e, s) {
+      setState(() {
+        _isLoading = false;
+      });
       _logger.error('Error regenerating response', e, s);
-      // Show an error toast to the user.
       toastification.show(
         type: ToastificationType.error,
         style: ToastificationStyle.flatColored,
@@ -339,17 +364,7 @@ class _ChatUIState extends State<ChatUI> {
         alignment: Alignment.bottomCenter,
         padding: const EdgeInsets.only(left: 8, right: 8),
         autoCloseDuration: const Duration(seconds: 4),
-        animationBuilder: (context, animation, alignment, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        borderRadius: BorderRadius.circular(100.0),
-        showProgressBar: true,
-        dragToClose: true,
       );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
     }
   }
 

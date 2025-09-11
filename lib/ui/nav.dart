@@ -21,25 +21,25 @@ class SideNav extends StatefulWidget {
   final VoidCallback onToggle;
 
   /// The list of chat sessions to display.
-  final List<ChatSession> chatList;
+  final List<ArcadiaChat> chatList;
 
   /// A callback function that is called when the user selects a chat.
-  final Function(ChatSession) onChatSelected;
+  final Function(ArcadiaChat) onChatSelected;
 
   /// A callback function that is called when the user deletes a chat.
-  final Function(ChatSession) onDeleteChat;
+  final Function(ArcadiaChat) onDeleteChat;
 
   /// A callback function that is called when the user archives a chat.
-  final Function(ChatSession) onArchiveChat;
+  final Function(ArcadiaChat) onArchiveChat;
 
   /// A callback function that is called when the user renames a chat.
-  final Function(ChatSession, String) onRenameChat;
+  final Function(ArcadiaChat, String) onRenameChat;
 
   /// A callback function that is called when the user exports a chat.
-  final Function(ChatSession) onExportChat;
+  final Function(ArcadiaChat) onExportChat;
 
   /// The currently selected chat session.
-  final ChatSession? selectedChat;
+  final ArcadiaChat? selectedChat;
 
   const SideNav({
     super.key,
@@ -62,7 +62,7 @@ class SideNav extends StatefulWidget {
 
 class _SideNavState extends State<SideNav> {
   /// Shows a dialog for renaming a chat session.
-  void _showRenameDialog(ChatSession chat) {
+  void _showRenameDialog(ArcadiaChat chat) {
     final controller = TextEditingController(text: chat.title);
     showDialog(
       context: context,
@@ -212,7 +212,7 @@ class _SideNavState extends State<SideNav> {
 /// A list tile that represents a single chat session in the side navigation.
 class ChatListTile extends StatefulWidget {
   /// The chat session to display.
-  final ChatSession chat;
+  final ArcadiaChat chat;
 
   /// Whether the tile is currently selected.
   final bool isSelected;

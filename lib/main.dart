@@ -8,6 +8,9 @@ import 'package:uuid/uuid.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+
 import 'services/model.dart';
 import 'services/logging.dart';
 import 'theme/manager.dart';
@@ -21,6 +24,10 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await windowManager.ensureInitialized();
   await Logging.configure();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   final packageInfo = await PackageInfo.fromPlatform();
   appVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
@@ -120,7 +127,7 @@ class ChatMessage {
 }
 
 /// Represents a chat session, which contains a list of messages and a title.
-class ChatSession {
+class ArcadiaChat {
   /// A unique identifier for the chat session.
   final String id;
 
@@ -133,16 +140,16 @@ class ChatSession {
   /// The version of the app that this chat was created in.
   final String version;
 
-  ChatSession({
+  ArcadiaChat({
     String? id,
     required this.title,
     required this.messages,
     required this.version,
   }) : id = id ?? const Uuid().v4();
 
-  /// Creates a [ChatSession] from a JSON object.
-  factory ChatSession.fromJson(Map<String, dynamic> json) {
-    return ChatSession(
+  /// Creates a [ArcadiaChat] from a JSON object.
+  factory ArcadiaChat.fromJson(Map<String, dynamic> json) {
+    return ArcadiaChat(
       id: json['id'],
       title: json['title'],
       messages: (json['messages'] as List)
@@ -152,7 +159,7 @@ class ChatSession {
     );
   }
 
-  /// Converts the [ChatSession] to a JSON object.
+  /// Converts the [ArcadiaChat] to a JSON object.
   Map<String, dynamic> toJson() {
     return {
       'id': id,

@@ -31,21 +31,21 @@ class ChatHistoryService {
   /// Loads all chat sessions from the file system.
   ///
   /// This method reads all `.json` files from the chats directory, decodes
-  /// them into [ChatSession] objects, and returns them sorted by last
+  /// them into [ArcadiaChat] objects, and returns them sorted by last
   /// modified date.
-  Future<List<ChatSession>> loadChats() async {
+  Future<List<ArcadiaChat>> loadChats() async {
     try {
       final chatsDir = await _getChatsDirectory();
       final chatFiles = chatsDir.listSync().where(
         (f) => f.path.endsWith('.json'),
       );
 
-      final chats = <ChatSession>[];
+      final chats = <ArcadiaChat>[];
       for (final file in chatFiles) {
         try {
           final content = await (file as File).readAsString();
           final json = jsonDecode(content);
-          chats.add(ChatSession.fromJson(json));
+          chats.add(ArcadiaChat.fromJson(json));
         } catch (e, s) {
           _logger.error('Error loading chat file: ${file.path}', e, s);
         }
@@ -64,7 +64,7 @@ class ChatHistoryService {
   ///
   /// This method serializes the [chat] object to JSON and writes it to a file
   /// named after the chat's ID.
-  Future<void> saveChat(ChatSession chat) async {
+  Future<void> saveChat(ArcadiaChat chat) async {
     try {
       final chatsDir = await _getChatsDirectory();
       final file = File(p.join(chatsDir.path, '${chat.id}.json'));
@@ -78,7 +78,7 @@ class ChatHistoryService {
   /// Deletes a chat session from the file system.
   ///
   /// This method deletes the file corresponding to the given [chat].
-  Future<void> deleteChat(ChatSession chat) async {
+  Future<void> deleteChat(ArcadiaChat chat) async {
     try {
       final chatsDir = await _getChatsDirectory();
       final file = File(p.join(chatsDir.path, '${chat.id}.json'));
@@ -94,7 +94,7 @@ class ChatHistoryService {
   /// Renames a chat session.
   ///
   /// This method updates the title of the [chat] and saves it.
-  Future<void> renameChat(ChatSession chat, String newTitle) async {
+  Future<void> renameChat(ArcadiaChat chat, String newTitle) async {
     chat.title = newTitle;
     await saveChat(chat);
     _logger.info('Renamed chat with ID: ${chat.id} to "$newTitle"');
@@ -103,7 +103,7 @@ class ChatHistoryService {
   /// Archives a chat session.
   ///
   /// This method moves the chat file to an 'archived' subdirectory.
-  Future<void> archiveChat(ChatSession chat) async {
+  Future<void> archiveChat(ArcadiaChat chat) async {
     try {
       final chatsDir = await _getChatsDirectory();
       final archiveDir = Directory(p.join(chatsDir.path, 'archived'));
@@ -125,7 +125,7 @@ class ChatHistoryService {
   /// Adds a new chat session.
   ///
   /// This is an alias for [saveChat].
-  Future<void> addChat(ChatSession chat) async {
+  Future<void> addChat(ArcadiaChat chat) async {
     await saveChat(chat);
   }
 }
