@@ -100,8 +100,9 @@ class _ChatUIState extends State<ChatUI> {
     final List<String> attachmentPaths = [];
     if (originalAttachments.isNotEmpty) {
       final docs = await getApplicationDocumentsDirectory();
-      final attachmentsDir =
-          Directory(p.join(docs.path, 'Arcadia', 'attachments'));
+      final attachmentsDir = Directory(
+        p.join(docs.path, 'Arcadia', 'attachments'),
+      );
       if (!await attachmentsDir.exists()) {
         await attachmentsDir.create(recursive: true);
       }
@@ -112,8 +113,9 @@ class _ChatUIState extends State<ChatUI> {
           attachmentPaths.add(newPath);
         }
       }
-      _logger
-          .info('Copied ${attachmentPaths.length} attachments to permanent storage.');
+      _logger.info(
+        'Copied ${attachmentPaths.length} attachments to permanent storage.',
+      );
     }
 
     // Optimistically update the UI
@@ -151,15 +153,19 @@ class _ChatUIState extends State<ChatUI> {
       if (isNewChat) {
         _logger.info('New chat detected. Generating title.');
         final titlePrompt =
-            'Generate a short, concise title (5 words max) for an ai chat started with this user query:\n\n$originalMessage\n\n[Please do not provide anything else, just the 5 word title.]';
-        final titleResponse =
-            await titleModel.generateContent([Content.text(titlePrompt)]);
+            'Generate a short, concise header (5 words max) for an ai chat started with this user query:\n\n$originalMessage\n\n[Please do not provide anything else, just the 5 word title. This will show up in a list of multiple user chat sessions so it needs to be easily distiniguishable without the need to open the chat.]';
+        final titleResponse = await titleModel.generateContent([
+          Content.text(titlePrompt),
+        ]);
         if (titleResponse.text != null) {
           setState(() {
-            widget.chatSession.title =
-                titleResponse.text!.replaceAll('"', '').trim();
+            widget.chatSession.title = titleResponse.text!
+                .replaceAll('"', '')
+                .trim();
           });
           _logger.info('Generated new chat title: ${widget.chatSession.title}');
+          // Save the chat to history so it appears in the nav list
+          await _chatHistoryService.saveChat(widget.chatSession);
           widget.onNewMessage?.call(widget.chatSession.title);
         } else {
           _logger.warning('Failed to generate chat title.');

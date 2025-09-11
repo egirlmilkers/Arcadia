@@ -409,19 +409,7 @@ class _MainUIState extends State<MainUI> {
                               selectedModel: modelManager.selectedModel,
                               onNewMessage: (String title) async {
                                 await _loadChatHistory();
-                                setState(() {
-                                  if (_activeChat != null) {
-                                    try {
-                                      final newActiveChat = _chatHistory
-                                          .firstWhere(
-                                            (c) => c.id == _activeChat!.id,
-                                          );
-                                      _activeChat = newActiveChat;
-                                    } catch (e) {
-                                      _activeChat = null;
-                                    }
-                                  }
-                                });
+                                setState(() {});
                               },
                             ),
                     ),
