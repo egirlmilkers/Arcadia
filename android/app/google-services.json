@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "937215531237",
+    "project_id": "arcadia-flutter",
+    "storage_bucket": "arcadia-flutter.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:937215531237:android:f5fa3101a0ad8435f15c0c",
+        "android_client_info": {
+          "package_name": "egirlmilkers.arcadia"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCJNMO3T-fSqrP5NDrQXBKvxjO68rHS0CU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
