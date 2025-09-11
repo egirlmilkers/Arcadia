@@ -401,7 +401,12 @@ class _ChatUIState extends State<ChatUI> {
                       child: SingleChildScrollView(
                         controller: _scrollController,
                         physics: const ClampingScrollPhysics(),
-                        padding: const EdgeInsets.only(top: 50, left: 16, right: 16, bottom: 25),
+                        padding: const EdgeInsets.only(
+                          top: 50,
+                          left: 16,
+                          right: 16,
+                          bottom: 25,
+                        ),
                         child: Column(
                           children: [
                             for (
@@ -584,8 +589,8 @@ class _ChatUIState extends State<ChatUI> {
                     icon: Icon(_isLoading ? Icons.stop : Icons.send),
                     onPressed: _isLoading ? _stopMessage : _sendMessage,
                     style: IconButton.styleFrom(
-                      backgroundColor: theme.colorScheme.primary,
-                      foregroundColor: theme.colorScheme.onPrimary,
+                      backgroundColor: theme.colorScheme.secondaryContainer,
+                      foregroundColor: theme.colorScheme.onSecondaryContainer,
                       padding: const EdgeInsets.all(12.0),
                     ),
                   ),
@@ -783,6 +788,7 @@ class _MessageBubbleState extends State<MessageBubble>
   bool _isHovering = false;
   bool _isEditing = false;
   late TextEditingController _editingController;
+  bool _isSummaryExpanded = false;
 
   @override
   void initState() {
@@ -854,7 +860,7 @@ class _MessageBubbleState extends State<MessageBubble>
               ),
               decoration: BoxDecoration(
                 color: isUser
-                    ? theme.colorScheme.primaryContainer
+                    ? theme.colorScheme.secondary
                     : Colors.transparent,
                 borderRadius: isUser
                     ? const BorderRadius.only(
@@ -899,8 +905,10 @@ class _MessageBubbleState extends State<MessageBubble>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Display the thinking process if it exists.
-                        if (!isUser && widget.message.thinkingProcess != null)
+                        if (!isUser &&
+                            widget.message.thinkingProcess != null) ...[
                           _buildThinkingProcess(context),
+                        ],
                         // The message text, rendered as Markdown.
                         SelectionArea(
                           selectionControls: materialTextSelectionControls,
@@ -908,7 +916,7 @@ class _MessageBubbleState extends State<MessageBubble>
                             messageText,
                             style: theme.textTheme.bodyLarge?.copyWith(
                               color: isUser
-                                  ? theme.colorScheme.onPrimaryContainer
+                                  ? theme.colorScheme.onSecondary
                                   : theme.colorScheme.onSurface,
                             ),
                             codeBuilder: (context, name, code, closed) {
@@ -926,14 +934,14 @@ class _MessageBubbleState extends State<MessageBubble>
                       ],
                     ),
                   ),
-                  if (isUser) const SizedBox(width: 8.0),
                   // Action bar for user messages.
-                  if (isUser)
+                  if (isUser) ...[
+                    const SizedBox(width: 8.0),
                     AnimatedOpacity(
                       opacity: shouldShowButtons ? 1.0 : 0.0,
                       duration: 200.ms,
                       child: _buildActionBar(context, isUser),
-                    ),
+                    ),]
                 ],
               ),
             ),
@@ -961,34 +969,61 @@ class _MessageBubbleState extends State<MessageBubble>
   /// Builds the widget that displays the AI's thinking process.
   Widget _buildThinkingProcess(BuildContext context) {
     final theme = Theme.of(context);
-    return Theme(
-      data: theme.copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        backgroundColor: theme.colorScheme.surfaceContainerHigh,
-        tilePadding: const EdgeInsets.symmetric(horizontal: 10),
-        childrenPadding: const EdgeInsets.all(10),
-        title: Text(
-          'Thinking Summary',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeOut,
+      // Animate the width based on the state variable.
+      width: _isSummaryExpanded ? 600 : 170,
+      child: Material(
+        // material so the colors dont clash with the expansion material
+        animateColor: true,
+        color: _isSummaryExpanded
+            ? theme.colorScheme.inversePrimary
+            : theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(25),
+        // clips the corners of children as well
+        clipBehavior: Clip.antiAlias,
+        child: Theme(
+          data: theme.copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            dense: true,
+            // When the tile is toggled, update the state variable.
+            onExpansionChanged: (expanded) {
+              setState(() {
+                _isSummaryExpanded = expanded;
+              });
+            },
+            tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+            childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            title: Text(
+              'Thinking Summary',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onPrimaryContainer,
+              ),
+              overflow: TextOverflow.fade,
+              maxLines: 1,
+            ),
+            collapsedIconColor: theme.colorScheme.onPrimaryContainer,
+            iconColor: theme.colorScheme.onPrimaryContainer,
+            children: [
+              GptMarkdown(
+                widget.message.thinkingProcess!,
+                style: theme.textTheme.bodyLarge?.copyWith(),
+                codeBuilder: (context, name, code, closed) {
+                  return CodeBlock(
+                    language: name,
+                    code: code,
+                    brightness: Theme.of(context).brightness,
+                  );
+                },
+                highlightBuilder: (context, text, style) {
+                  return Highlight(text: text);
+                },
+              ),
+            ],
           ),
         ),
-        children: [
-          GptMarkdown(
-            widget.message.thinkingProcess!,
-            style: theme.textTheme.bodyLarge?.copyWith(),
-            codeBuilder: (context, name, code, closed) {
-              return CodeBlock(
-                language: name,
-                code: code,
-                brightness: Theme.of(context).brightness,
-              );
-            },
-            highlightBuilder: (context, text, style) {
-              return Highlight(text: text);
-            },
-          ),
-        ],
       ),
     );
   }
@@ -996,7 +1031,7 @@ class _MessageBubbleState extends State<MessageBubble>
   /// Builds the action bar with buttons for copying, editing, etc.
   Widget _buildActionBar(BuildContext context, bool isUser) {
     final theme = Theme.of(context);
-    final onPrimaryContainer = theme.colorScheme.onPrimaryContainer;
+    final onSecondary = theme.colorScheme.onSecondary;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -1010,7 +1045,7 @@ class _MessageBubbleState extends State<MessageBubble>
                     context,
                     _isExpanded ? Icons.expand_less : Icons.expand_more,
                     () => setState(() => _isExpanded = !_isExpanded),
-                    color: onPrimaryContainer,
+                    color: onSecondary,
                   ),
                 ),
               // Copy button.
@@ -1019,7 +1054,7 @@ class _MessageBubbleState extends State<MessageBubble>
                 child: _buildIconButton(context, Icons.copy_all_outlined, () {
                   Clipboard.setData(ClipboardData(text: widget.message.text));
                   showCopiedToast(context, theme.colorScheme);
-                }, color: onPrimaryContainer),
+                }, color: onSecondary),
               ),
               // Edit button.
               Tooltip(
@@ -1028,7 +1063,7 @@ class _MessageBubbleState extends State<MessageBubble>
                   setState(() {
                     _isEditing = true;
                   });
-                }, color: onPrimaryContainer),
+                }, color: onSecondary),
               ),
             ]
           : [
@@ -1074,11 +1109,11 @@ class _MessageBubbleState extends State<MessageBubble>
   Widget _buildEditingView(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(8.0),
+      padding: const EdgeInsets.only(right: 8, bottom: 8),
       margin: const EdgeInsets.symmetric(vertical: 4.0),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12.0),
+        borderRadius: BorderRadius.circular(16.0),
       ),
       child: Column(
         children: [
@@ -1089,12 +1124,12 @@ class _MessageBubbleState extends State<MessageBubble>
             maxLines: null,
             decoration: const InputDecoration(
               border: InputBorder.none,
-              contentPadding: EdgeInsets.zero,
+              contentPadding: EdgeInsets.symmetric(horizontal: 14),
             ),
           ),
-          const SizedBox(height: 8.0),
           // Action buttons for saving or cancelling the edit.
           Row(
+            spacing: 8,
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               TextButton(
@@ -1106,7 +1141,6 @@ class _MessageBubbleState extends State<MessageBubble>
                 },
                 child: const Text('Cancel'),
               ),
-              const SizedBox(width: 8.0),
               FilledButton(
                 onPressed: () {
                   widget.onMessageEdited(_editingController.text);

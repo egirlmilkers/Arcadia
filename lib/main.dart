@@ -34,8 +34,6 @@ void main() async {
 }
 
 // ========== TODO ==========
-// - thinking dropdown polish
-
 // - web version
 // - raem theme
 
@@ -43,18 +41,16 @@ void main() async {
 // - gemma
 // - android version
 // - allow models like chatgpt and deepseek
-// - app icon
 // - pinning chats
 // - drag and drop files
 // - view archived chats
-// - logs with every ui element interaction logged
 // - personalized starter prompt
 // - streaming output & thinking
 // - action buttons scroll with app bar
 // - selectable syntax themes
 // - table format
 // - thought for x seconds
-// - split widgets
+// - split widgets to files
 // - warning popups with (dont ask again) remembering
 // - allow all files attachment
 
