@@ -35,7 +35,7 @@ void main() async {
 
 // ========== TODO ==========
 // - web version
-// - raem theme
+// - resizing the window too small breaks it
 
 // ===== Future Updates =====
 // - gemma

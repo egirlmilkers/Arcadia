@@ -2,11 +2,13 @@
 	{
 		"displayName": "2.5 Flash",
 		"subtitle": "Fast all-around help",
-		"modelName": "gemini-2.5-flash"
+		"name": "gemini-2.5-flash",
+		"url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 	},
 	{
 		"displayName": "2.5 Pro",
 		"subtitle": "Reasoning, math & code",
-		"modelName": "gemini-2.5-pro"
+		"name": "gemini-2.5-pro",
+		"url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
 	}
 ]

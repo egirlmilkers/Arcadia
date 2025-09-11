@@ -14,12 +14,16 @@ class Model {
   final String subtitle;
 
   /// The name of the model to be used in API calls.
-  final String modelName;
+  final String name;
+
+  /// The URL of the model for API calls.
+  final String url;
 
   Model({
     required this.displayName,
     required this.subtitle,
-    required this.modelName,
+    required this.name,
+    required this.url,
   });
 
   /// Creates a [Model] from a JSON object.
@@ -27,7 +31,8 @@ class Model {
     return Model(
       displayName: json['displayName'],
       subtitle: json['subtitle'],
-      modelName: json['modelName'],
+      name: json['name'],
+      url: json['url'],
     );
   }
 }
@@ -35,7 +40,7 @@ class Model {
 /// A class that manages the available models and the currently selected model.
 class ModelManager extends ChangeNotifier {
   List<Model> _models = [];
-  String _selectedModelName = '';
+  Model? _selectedModel;
   bool _loading = true;
 
   ModelManager() {
@@ -49,10 +54,11 @@ class ModelManager extends ChangeNotifier {
   List<Model> get models => _models;
 
   /// The currently selected model.
-  Model get selectedModel => _models.firstWhere(
-    (m) => m.modelName == _selectedModelName,
-    orElse: () => _models.first,
-  );
+  Model get selectedModel =>
+      _selectedModel ??
+      (_models.isNotEmpty
+          ? _models.first
+          : Model(displayName: '', subtitle: '', name: '', url: ''));
 
   /// Loads the models and settings from their respective sources.
   Future<void> _load() async {
@@ -76,21 +82,30 @@ class ModelManager extends ChangeNotifier {
   /// Loads the selected model from shared preferences.
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    _selectedModelName =
-        prefs.getString('selectedModelName') ??
-        (_models.isNotEmpty ? _models.first.modelName : '');
+    final selectedModelName = prefs.getString('selectedModelName');
+    if (selectedModelName != null) {
+      try {
+        _selectedModel = _models.firstWhere((m) => m.name == selectedModelName);
+      } catch (e) {
+        _selectedModel = _models.isNotEmpty ? _models.first : null;
+      }
+    } else {
+      _selectedModel = _models.isNotEmpty ? _models.first : null;
+    }
   }
 
   /// Saves the selected model to shared preferences.
   Future<void> _saveSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('selectedModelName', _selectedModelName);
+    if (_selectedModel != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('selectedModelName', _selectedModel!.name);
+    }
   }
 
   /// Sets the selected model.
-  void setSelectedModel(String modelName) {
-    if (_models.any((m) => m.modelName == modelName)) {
-      _selectedModelName = modelName;
+  void setSelectedModel(Model model) {
+    if (_models.contains(model)) {
+      _selectedModel = model;
       _saveSettings();
       notifyListeners();
     }

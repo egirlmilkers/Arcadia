@@ -21,13 +21,13 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
 
   // Extracts parameters required for the API call.
   final String apiKey = params['apiKey'];
-  final String model = params['model'];
+  final String modelUrl = params['url'];
   final List<ChatMessage> messages = (params['messages'] as List)
       .map((m) => ChatMessage.fromJson(m as Map<String, dynamic>))
       .toList();
 
   // The host for the Gemini API.
-  const String host = 'generativelanguage.googleapis.com';
+  final host = Uri.parse(modelUrl).host;
 
   HttpClient? client = HttpClient();
   var requestCancelled = false;
@@ -45,16 +45,13 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
   });
 
   try {
-    InternetAddress? ipAddress;
     try {
       // Performs a DNS lookup to get the IP address of the API host.
       final addresses = await InternetAddress.lookup(
         host,
         type: InternetAddressType.IPv4,
       );
-      if (addresses.isNotEmpty) {
-        ipAddress = addresses.first;
-      } else {
+      if (!addresses.isNotEmpty) {
         // Sends an error message if DNS resolution fails.
         mainSendPort.send('Error: Could not resolve DNS for API host (IPv4).');
         logger.error('Could not resolve DNS for API host (IPv4).');
@@ -76,9 +73,7 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
     }
 
     // Constructs the API endpoint URL.
-    final url = Uri.parse(
-      'https://${ipAddress.address}/v1beta/models/$model:generateContent',
-    );
+    final url = Uri.parse(modelUrl);
 
     // Prepares the chat history for the API request.
     var history = List.of(messages);
@@ -128,8 +123,8 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
     // Configures the HttpClient to trust the Google API certificate.
     client!.badCertificateCallback =
         (X509Certificate cert, String connectedHost, int port) {
-      return cert.subject.contains('CN=*.googleapis.com');
-    };
+          return cert.subject.contains(host);
+        };
 
     // Sends the API request.
     final request = await client!.postUrl(url);
@@ -147,7 +142,9 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
       final candidates = jsonResponse['candidates'];
       if (candidates != null && candidates.isNotEmpty) {
         final content = candidates[0]['content'];
-        if (content != null && content['parts'] != null && content['parts'].isNotEmpty) {
+        if (content != null &&
+            content['parts'] != null &&
+            content['parts'].isNotEmpty) {
           final List<dynamic> parts = content['parts'];
           String thoughtSummary = '';
           String finalAnswer = '';
@@ -168,11 +165,15 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
           });
         } else {
           mainSendPort.send('Error: Invalid response structure from API.');
-          logger.error('Invalid response structure: "parts" field is missing or empty.');
+          logger.error(
+            'Invalid response structure: "parts" field is missing or empty.',
+          );
         }
       } else {
         mainSendPort.send('Error: Invalid response structure from API.');
-        logger.error('Invalid response structure: "candidates" field is missing or empty.');
+        logger.error(
+          'Invalid response structure: "candidates" field is missing or empty.',
+        );
       }
     } else {
       // Sends an error message if the API call was unsuccessful.
@@ -224,10 +225,10 @@ class GeminiService {
   /// response from the API.
   ///
   /// - [messages]: The list of [ChatMessage]s to send to the model.
-  /// - [model]: The name of the model to use for content generation.
+  /// - [url]: The URL of the model to use for content generation.
   Future<Map<String, dynamic>> generateContent(
     List<ChatMessage> messages,
-    String model,
+    String url,
   ) async {
     final completer = Completer<Map<String, dynamic>>();
     final receivePort = ReceivePort();
@@ -239,7 +240,7 @@ class GeminiService {
     _isolate = await Isolate.spawn(_generateContentIsolate, {
       'sendPort': receivePort.sendPort,
       'apiKey': apiKey,
-      'model': model,
+      'url': url,
       'messages': messagesAsJson,
     });
 

@@ -262,7 +262,7 @@ class _MainUIState extends State<MainUI> {
                       colors: [
                         theme.colorScheme.surface.withValues(alpha: 1),
                         theme.colorScheme.surface.withValues(alpha: 0.8),
-                        theme.colorScheme.surface.withValues(alpha: 0)
+                        theme.colorScheme.surface.withValues(alpha: 0),
                       ],
                     ),
                   ),
@@ -315,7 +315,7 @@ class _MainUIState extends State<MainUI> {
                                       );
 
                                   // Show the dropdown menu.
-                                  showMenu<String>(
+                                  showMenu<Model>(
                                     context: context,
                                     position: position,
                                     menuPadding: EdgeInsets.zero,
@@ -326,8 +326,8 @@ class _MainUIState extends State<MainUI> {
                                     items: modelManager.models.map((
                                       Model model,
                                     ) {
-                                      return PopupMenuItem<String>(
-                                        value: model.modelName,
+                                      return PopupMenuItem<Model>(
+                                        value: model,
                                         padding: const EdgeInsets.all(12),
                                         child: Column(
                                           crossAxisAlignment:
@@ -347,7 +347,7 @@ class _MainUIState extends State<MainUI> {
                                         ),
                                       );
                                     }).toList(),
-                                  ).then((String? value) {
+                                  ).then((Model? value) {
                                     if (value != null) {
                                       modelManager.setSelectedModel(value);
                                     }
@@ -402,8 +402,7 @@ class _MainUIState extends State<MainUI> {
                           : ChatUI(
                               key: ValueKey(_activeChat!.id),
                               chatSession: _activeChat!,
-                              selectedModel:
-                                  modelManager.selectedModel.modelName,
+                              selectedModel: modelManager.selectedModel,
                               onNewMessage: (String title) async {
                                 await _loadChatHistory();
                                 setState(() {

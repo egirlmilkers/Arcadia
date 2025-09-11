@@ -14,13 +14,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../services/logging.dart';
 import 'welcome.dart';
 import 'md/code_block.dart';
 import 'md/highlight.dart';
 import '../main.dart';
 import '../services/chat_history.dart';
 import '../services/gemini.dart';
-import '../services/logging.dart';
+import '../services/model.dart' as model_service;
 import '../theme/manager.dart';
 import '../util.dart';
 import 'widgets/thinking_spinner.dart';
@@ -35,7 +36,7 @@ class ChatUI extends StatefulWidget {
   final ChatSession chatSession;
 
   /// The name of the selected model for content generation.
-  final String selectedModel;
+  final model_service.Model selectedModel;
 
   /// A callback function that is called when a new message is sent.
   final Function(String)? onNewMessage;
@@ -155,13 +156,14 @@ class _ChatUIState extends State<ChatUI> {
         _logger.info('New chat detected. Generating title and content.');
         final prompt =
             'Generate a short, concise title (5 words max) for an ai chat started with this user query:\n\n$originalMessage';
-        final titleFuture = titleService.generateContent([
-          ChatMessage(text: prompt, isUser: true),
-        ], 'gemini-1.5-flash-latest');
+        final titleFuture = titleService.generateContent(
+          [ChatMessage(text: prompt, isUser: true)],
+          'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
+        );
 
         final contentFuture = contentService.generateContent(
           widget.chatSession.messages,
-          widget.selectedModel,
+          widget.selectedModel.url,
         );
 
         final results = await Future.wait([titleFuture, contentFuture]);
@@ -182,7 +184,7 @@ class _ChatUIState extends State<ChatUI> {
         // If it's an existing chat, just generate content.
         modelResponse = await contentService.generateContent(
           widget.chatSession.messages,
-          widget.selectedModel,
+          widget.selectedModel.url,
         );
       }
 
@@ -295,7 +297,7 @@ class _ChatUIState extends State<ChatUI> {
 
       final modelResponse = await contentService.generateContent(
         widget.chatSession.messages,
-        widget.selectedModel,
+        widget.selectedModel.url,
       );
 
       // Handle user cancellation.
@@ -392,7 +394,10 @@ class _ChatUIState extends State<ChatUI> {
           // If there are no messages, show the welcome UI.
           child: widget.chatSession.messages.isEmpty
               ? const WelcomeUI()
-              : Center(
+              : Align(
+                  // Replaced Center with Align
+                  alignment:
+                      Alignment.topCenter, // Aligns the child to the bottom
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 900),
                     // A scrollable column of all messages in the chat session.
@@ -941,7 +946,8 @@ class _MessageBubbleState extends State<MessageBubble>
                       opacity: shouldShowButtons ? 1.0 : 0.0,
                       duration: 200.ms,
                       child: _buildActionBar(context, isUser),
-                    ),]
+                    ),
+                  ],
                 ],
               ),
             ),
