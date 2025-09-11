@@ -25,6 +25,7 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
   final List<ChatMessage> messages = (params['messages'] as List)
       .map((m) => ChatMessage.fromJson(m as Map<String, dynamic>))
       .toList();
+  final bool canThink = params['thinking'];
 
   // The host for the Gemini API.
   final host = Uri.parse(modelUrl).host;
@@ -86,7 +87,7 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
     history = history.sublist(firstUserIndex);
 
     // Constructs the request body with message content and attachments.
-    final body = {
+    final body = <String, dynamic>{
       'contents': await Future.wait(
         history.map((message) async {
           final parts = <Map<String, dynamic>>[];
@@ -115,10 +116,15 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
           return {'role': message.isUser ? 'user' : 'model', 'parts': parts};
         }),
       ),
-      "generationConfig": {
-        "thinkingConfig": {"thinkingBudget": -1, "includeThoughts": true},
-      },
     };
+
+    if (canThink) {
+      body['generationConfig'] = {
+        'thinkingConfig': {'thinkingBudget': -1, 'includeThoughts': true},
+      };
+    }
+
+    logger.info(body.toString());
 
     // Configures the HttpClient to trust the Google API certificate.
     client!.badCertificateCallback =
@@ -226,9 +232,11 @@ class GeminiService {
   ///
   /// - [messages]: The list of [ChatMessage]s to send to the model.
   /// - [url]: The URL of the model to use for content generation.
+  /// - [thinking]: Whether the model can use the thinking feature.
   Future<Map<String, dynamic>> generateContent(
     List<ChatMessage> messages,
     String url,
+    {bool? thinking = false}
   ) async {
     final completer = Completer<Map<String, dynamic>>();
     final receivePort = ReceivePort();
@@ -242,6 +250,7 @@ class GeminiService {
       'apiKey': apiKey,
       'url': url,
       'messages': messagesAsJson,
+      'thinking': thinking,
     });
 
     // Listens for data from the isolate.

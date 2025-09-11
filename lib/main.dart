@@ -36,6 +36,8 @@ void main() async {
 // ========== TODO ==========
 // - web version
 // - resizing the window too small breaks it
+// - chat file versions
+// - investigate thinking
 
 // ===== Future Updates =====
 // - gemma

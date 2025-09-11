@@ -19,11 +19,15 @@ class Model {
   /// The URL of the model for API calls.
   final String url;
 
+  /// Whether the model is capable of thinking.
+  final bool thinking;
+
   Model({
     required this.displayName,
     required this.subtitle,
     required this.name,
     required this.url,
+    this.thinking = false,
   });
 
   /// Creates a [Model] from a JSON object.
@@ -33,6 +37,7 @@ class Model {
       subtitle: json['subtitle'],
       name: json['name'],
       url: json['url'],
+      thinking: json['thinking'] ?? false,
     );
   }
 }
@@ -58,7 +63,13 @@ class ModelManager extends ChangeNotifier {
       _selectedModel ??
       (_models.isNotEmpty
           ? _models.first
-          : Model(displayName: '', subtitle: '', name: '', url: ''));
+          : Model(
+              displayName: '',
+              subtitle: '',
+              name: '',
+              url: '',
+              thinking: false,
+            ));
 
   /// Loads the models and settings from their respective sources.
   Future<void> _load() async {

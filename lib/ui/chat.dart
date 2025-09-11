@@ -159,11 +159,13 @@ class _ChatUIState extends State<ChatUI> {
         final titleFuture = titleService.generateContent(
           [ChatMessage(text: prompt, isUser: true)],
           'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
+          thinking: false
         );
 
         final contentFuture = contentService.generateContent(
           widget.chatSession.messages,
           widget.selectedModel.url,
+          thinking: widget.selectedModel.thinking,
         );
 
         final results = await Future.wait([titleFuture, contentFuture]);
@@ -185,6 +187,7 @@ class _ChatUIState extends State<ChatUI> {
         modelResponse = await contentService.generateContent(
           widget.chatSession.messages,
           widget.selectedModel.url,
+          thinking: widget.selectedModel.thinking,
         );
       }
 
@@ -298,6 +301,7 @@ class _ChatUIState extends State<ChatUI> {
       final modelResponse = await contentService.generateContent(
         widget.chatSession.messages,
         widget.selectedModel.url,
+        thinking: widget.selectedModel.thinking,
       );
 
       // Handle user cancellation.
