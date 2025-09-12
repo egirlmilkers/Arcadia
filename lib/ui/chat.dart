@@ -334,12 +334,40 @@ class _ChatUIState extends State<ChatUI> {
     _logger.info('Regenerating response for message at index $messageIndex.');
 
     try {
-      final model = FirebaseAI.googleAI().generativeModel(model: widget.selectedModel.name);
+      final generationConfig = GenerationConfig(
+        thinkingConfig: widget.selectedModel.thinking ? ThinkingConfig(thinkingBudget: -1, includeThoughts: true) : null,
+      );
 
+      // prepare safety settings
+      final safetySettings = [
+        SafetySetting(HarmCategory.harassment, HarmBlockThreshold.off, null),
+        SafetySetting(HarmCategory.hateSpeech, HarmBlockThreshold.off, null),
+        SafetySetting(HarmCategory.sexuallyExplicit, HarmBlockThreshold.off, null),
+        SafetySetting(HarmCategory.dangerousContent, HarmBlockThreshold.off, null),
+      ];
+
+      // generate response with firebase ai
+      final model = FirebaseAI.googleAI().generativeModel(
+        model: widget.selectedModel.name,
+        generationConfig: generationConfig,
+        safetySettings: safetySettings,
+      );
+
+      // Construct the full prompt with history and new message
       final prompt = <Content>[];
       for (final message in widget.chatSession.messages) {
-        final parts = <Part>[TextPart(message.text)];
-        if (message.attachments.isNotEmpty) {
+        // For previous messages from the model, or user messages with no attachments,
+        // we use the standard Content constructor.
+        if (!message.isUser || message.attachments.isEmpty) {
+          prompt.add(Content(message.isUser ? 'user' : 'model', [TextPart(message.text)]));
+        }
+        // For the new user message that contains attachments,
+        // we use the Content.multi() constructor as shown in the documentation.
+        else {
+          // Following the docs: text part goes first.
+          final parts = <Part>[TextPart(message.text)];
+
+          // Then, add all the image/file attachments.
           for (final path in message.attachments) {
             final mimeType = lookupMimeType(path);
             if (mimeType != null) {
@@ -347,8 +375,9 @@ class _ChatUIState extends State<ChatUI> {
               parts.add(InlineDataPart(mimeType, bytes));
             }
           }
+          // Create the multimodal content part using the correct constructor.
+          prompt.add(Content.multi(parts));
         }
-        prompt.add(Content(message.isUser ? 'user' : 'model', parts));
       }
 
       setState(() {

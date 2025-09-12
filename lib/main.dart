@@ -52,7 +52,7 @@ void main() async {
 // ========== TODO ==========
 // - web version
 // - refresh data
-// - chat popup menu doesnt work if  not pinned
+// - chat popup menu doesnt work if not pinned
 // - generate even if switching tabs
 
 // ===== Future Updates =====
