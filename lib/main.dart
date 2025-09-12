@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:provider/provider.dart';
 import 'package:dynamic_color/dynamic_color.dart';
+import 'package:toastification/toastification.dart';
 import 'package:uuid/uuid.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -25,9 +26,7 @@ void main() async {
   await windowManager.ensureInitialized();
   await Logging.configure();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   final packageInfo = await PackageInfo.fromPlatform();
   appVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
@@ -35,7 +34,7 @@ void main() async {
   if (Platform.isWindows) {
     // fixes clipboard history flutter bug
     WindowsInjector.instance.injectKeyData();
-    
+
     WindowManager.instance.setMinimumSize(const Size(640, 480));
   }
 
@@ -53,6 +52,7 @@ void main() async {
 // ========== TODO ==========
 // - web version
 // - refresh data
+// - chat creates even if ai failed
 
 // ===== Future Updates =====
 // - gemma
@@ -62,7 +62,6 @@ void main() async {
 // - drag and drop files
 // - view archived chats
 // - personalized starter prompt
-// - streaming output & thinking
 // - action buttons scroll with app bar
 // - selectable syntax themes
 // - table format
@@ -89,7 +88,7 @@ class ChatMessage {
   final DateTime createdAt;
 
   /// The thinking process summary from the AI.
-  final String? thinkingProcess;
+  String? thinkingProcess;
 
   ChatMessage({
     required this.text,
@@ -187,39 +186,44 @@ class Arcadia extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Use a Consumer to listen for changes in the ThemeManager.
-    return Consumer<ThemeManager>(
-      builder: (context, themeManager, child) {
-        // Use a DynamicColorBuilder to get the device's dynamic colors.
-        return DynamicColorBuilder(
-          builder: (lightDynamic, darkDynamic) {
-            // Get the light and dark themes from the ThemeManager.
-            final themeData = themeManager.getTheme(
-              Brightness.light,
-              scheme: lightDynamic,
-            );
-            final darkThemeData = themeManager.getTheme(
-              Brightness.dark,
-              scheme: darkDynamic,
-            );
 
-            // The main MaterialApp widget.
-            return MaterialApp(
-              title: 'Arcadia',
-              theme: themeData.copyWith(
-                textTheme: themeData.textTheme.apply(fontFamily: 'GoogleSans'),
-              ),
-              darkTheme: darkThemeData.copyWith(
-                textTheme: darkThemeData.textTheme.apply(
-                  fontFamily: 'GoogleSans',
+    return ToastificationWrapper(
+      child: Consumer<ThemeManager>(
+        builder: (context, themeManager, child) {
+          // Use a DynamicColorBuilder to get the device's dynamic colors.
+          return DynamicColorBuilder(
+            builder: (lightDynamic, darkDynamic) {
+              // Get the light and dark themes from the ThemeManager.
+              final themeData = themeManager.getTheme(
+                Brightness.light,
+                scheme: lightDynamic,
+              );
+              final darkThemeData = themeManager.getTheme(
+                Brightness.dark,
+                scheme: darkDynamic,
+              );
+
+              // The main MaterialApp widget.
+              return MaterialApp(
+                title: 'Arcadia',
+                theme: themeData.copyWith(
+                  textTheme: themeData.textTheme.apply(
+                    fontFamily: 'GoogleSans',
+                  ),
                 ),
-              ),
-              themeMode: themeManager.themeMode,
-              home: const MainUI(),
-              debugShowCheckedModeBanner: false,
-            );
-          },
-        );
-      },
+                darkTheme: darkThemeData.copyWith(
+                  textTheme: darkThemeData.textTheme.apply(
+                    fontFamily: 'GoogleSans',
+                  ),
+                ),
+                themeMode: themeManager.themeMode,
+                home: const MainUI(),
+                debugShowCheckedModeBanner: false,
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

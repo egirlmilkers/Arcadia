@@ -140,9 +140,31 @@ class _ChatUIState extends State<ChatUI> {
     }
 
     try {
+      final generationConfig = GenerationConfig(
+        thinkingConfig: widget.selectedModel.thinking
+            ? ThinkingConfig(thinkingBudget: -1)
+            : null,
+      );
+
+      final safetySettings = [
+        SafetySetting(HarmCategory.harassment, HarmBlockThreshold.off, null),
+        SafetySetting(HarmCategory.hateSpeech, HarmBlockThreshold.off, null),
+        SafetySetting(
+          HarmCategory.sexuallyExplicit,
+          HarmBlockThreshold.off,
+          null,
+        ),
+        SafetySetting(
+          HarmCategory.dangerousContent,
+          HarmBlockThreshold.off,
+          null,
+        ),
+      ];
+
       final model = FirebaseAI.googleAI().generativeModel(
         model: widget.selectedModel.name,
-        // TODO: Pass safetySettings and generationConfig from the model definition
+        generationConfig: generationConfig,
+        safetySettings: safetySettings,
       );
 
       final titleModel = FirebaseAI.googleAI().generativeModel(
@@ -175,8 +197,22 @@ class _ChatUIState extends State<ChatUI> {
       // Construct the full prompt with history and new message
       final prompt = <Content>[];
       for (final message in widget.chatSession.messages) {
-        final parts = <Part>[TextPart(message.text)];
-        if (message.attachments.isNotEmpty) {
+        // For previous messages from the model, or user messages with no attachments,
+        // we use the standard Content constructor.
+        if (!message.isUser || message.attachments.isEmpty) {
+          prompt.add(
+            Content(message.isUser ? 'user' : 'model', [
+              TextPart(message.text),
+            ]),
+          );
+        }
+        // For the new user message that contains attachments,
+        // we use the Content.multi() constructor as shown in the documentation.
+        else {
+          // Following the docs: text part goes first.
+          final parts = <Part>[TextPart(message.text)];
+
+          // Then, add all the image/file attachments.
           for (final path in message.attachments) {
             final mimeType = lookupMimeType(path);
             if (mimeType != null) {
@@ -184,8 +220,9 @@ class _ChatUIState extends State<ChatUI> {
               parts.add(InlineDataPart(mimeType, bytes));
             }
           }
+          // Create the multimodal content part using the correct constructor.
+          prompt.add(Content.multi(parts));
         }
-        prompt.add(Content(message.isUser ? 'user' : 'model', parts));
       }
 
       // Add an empty message for the AI response to stream into
@@ -194,9 +231,22 @@ class _ChatUIState extends State<ChatUI> {
       });
       _scrollToBottom();
 
+      final thinkingProcessBuffer = StringBuffer();
       final stream = model.generateContentStream(prompt);
       _streamSubscription = stream.listen(
         (response) {
+          // The model's "thoughts" are streamed as function calls.
+          // We capture them here to display as the thinking process.
+          if (response.functionCalls.isNotEmpty) {
+            for (final call in response.functionCalls) {
+              if (call.name == 'print') {
+                final args = call.args['values'] as List<dynamic>;
+                final thoughts = args.map((a) => a.toString()).join(' ');
+                thinkingProcessBuffer.writeln('```\n$thoughts\n```');
+              }
+            }
+          }
+
           if (response.text != null) {
             setState(() {
               widget.chatSession.messages.last.text += response.text!;
@@ -205,6 +255,11 @@ class _ChatUIState extends State<ChatUI> {
           }
         },
         onDone: () async {
+          // Once the stream is done, add the captured thoughts to the message.
+          if (thinkingProcessBuffer.isNotEmpty) {
+            widget.chatSession.messages.last.thinkingProcess =
+                thinkingProcessBuffer.toString();
+          }
           await _chatHistoryService.saveChat(widget.chatSession);
           setState(() {
             _isLoading = false;
