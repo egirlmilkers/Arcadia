@@ -126,20 +126,22 @@ class _ChatUIState extends State<ChatUI> {
     // A new chat is defined by having only one message from the user.
     final bool isNewChat = widget.chatSession.messages.length == 1;
 
-    void revertOptimisticUI() {
+    //
+    void revertGivenPrompt() {
       setState(() {
         widget.chatSession.messages.removeLast();
         _textController.text = originalMessage;
         _attachments = originalAttachments;
       });
-      _logger.warning('Reverted optimistic UI update.');
+      _logger.warning('Unsent prompt.');
     }
 
     try {
       final generationConfig = GenerationConfig(
-        thinkingConfig: widget.selectedModel.thinking ? ThinkingConfig(thinkingBudget: -1) : null,
+        thinkingConfig: widget.selectedModel.thinking ? ThinkingConfig(thinkingBudget: -1, includeThoughts: true) : null,
       );
 
+      // prepare safety settings
       final safetySettings = [
         SafetySetting(HarmCategory.harassment, HarmBlockThreshold.off, null),
         SafetySetting(HarmCategory.hateSpeech, HarmBlockThreshold.off, null),
@@ -147,12 +149,14 @@ class _ChatUIState extends State<ChatUI> {
         SafetySetting(HarmCategory.dangerousContent, HarmBlockThreshold.off, null),
       ];
 
+      // generate response with firebase ai
       final model = FirebaseAI.googleAI().generativeModel(
         model: widget.selectedModel.name,
         generationConfig: generationConfig,
         safetySettings: safetySettings,
       );
 
+      // a super quick model that we use to do minimal shit (chat name)
       final titleModel = FirebaseAI.googleAI().generativeModel(model: 'gemini-1.5-flash');
 
       // Generate title for new chats
@@ -166,8 +170,6 @@ class _ChatUIState extends State<ChatUI> {
             widget.chatSession.title = titleResponse.text!.replaceAll('"', '').trim();
           });
           _logger.info('Generated new chat title: ${widget.chatSession.title}');
-          // Save the chat to history so it appears in the nav list
-          await _chatHistoryService.saveChat(widget.chatSession);
           widget.onNewMessage?.call(widget.chatSession.title);
         } else {
           _logger.warning('Failed to generate chat title.');
@@ -201,16 +203,18 @@ class _ChatUIState extends State<ChatUI> {
         }
       }
 
-      // Add an empty message for the AI response to stream into
+      // Add an empty message for the AI response to stream into (cant stream into null)
       setState(() {
-        widget.chatSession.messages.add(ChatMessage(text: '', isUser: false, thinkingProcess: ' '));
+        widget.chatSession.messages.add(ChatMessage(text: '', isUser: false, thinkingProcess: ''));
       });
       _scrollToBottom();
 
+      // same as generateContent but gets the stream from it
       final stream = model.generateContentStream(prompt);
-      _handleStreamedResponse(stream, revertOptimisticUI: revertOptimisticUI);
+      _handleStreamedResponse(stream, isNewChat: isNewChat, revertGivenPrompt: revertGivenPrompt);
     } catch (e, s) {
-      revertOptimisticUI();
+      // give the user back their prompt if something fails
+      revertGivenPrompt();
       setState(() {
         _isLoading = false;
       });
@@ -229,30 +233,34 @@ class _ChatUIState extends State<ChatUI> {
 
   void _handleStreamedResponse(
     Stream<GenerateContentResponse> stream, {
-    VoidCallback? revertOptimisticUI,
+    bool isNewChat = false,
+    VoidCallback? revertGivenPrompt,
   }) {
+    bool watchFirstChunk = isNewChat; // once we receive the first chunk, we know nothing failed
+
+    // since prompt didn't fail, we NOW save the new chat
     _streamSubscription = stream.listen(
       (response) {
-        // The model's "thoughts" are streamed as function calls.
-        // We capture them here to display as the thinking process.
-        if (response.functionCalls.isNotEmpty) {
-          for (final call in response.functionCalls) {
-            if (call.name == 'print') {
-              final args = call.args['values'] as List<dynamic>;
-              final thoughts = args.map((a) => a.toString()).join(' ');
-              setState(() {
-                widget.chatSession.messages.last.thinkingProcess =
-                    '${widget.chatSession.messages.last.thinkingProcess}```\n$thoughts\n```';
-              });
-            }
-          }
+        if (watchFirstChunk) {
+          watchFirstChunk = false; // no longer need to look cus we got it
+          _chatHistoryService.saveChat(widget.chatSession);
         }
 
+        final lastMsg = widget.chatSession.messages.last;
+
+        // The model's "thoughts" are streamed during generation
+        if (response.thoughtSummary != null) {
+          setState(() {
+            lastMsg.thinkingProcess = (lastMsg.thinkingProcess ?? '') + response.thoughtSummary!;
+          });
+        }
+
+        // constantly keep the message up-to-date with stream
         if (response.text != null) {
           setState(() {
-            widget.chatSession.messages.last.text += response.text!;
+            lastMsg.text += response.text!;
           });
-          _scrollToBottom(duration: 500);
+          // _scrollToBottom(duration: 500);
         }
       },
       onDone: () async {
@@ -263,8 +271,8 @@ class _ChatUIState extends State<ChatUI> {
         _logger.info('Message stream finished.');
       },
       onError: (e) {
-        if (revertOptimisticUI != null) {
-          revertOptimisticUI();
+        if (revertGivenPrompt != null) {
+          revertGivenPrompt();
         }
         // Remove the empty AI message holder
         if (widget.chatSession.messages.isNotEmpty && !widget.chatSession.messages.last.isUser) {
@@ -344,7 +352,7 @@ class _ChatUIState extends State<ChatUI> {
       }
 
       setState(() {
-        widget.chatSession.messages.add(ChatMessage(text: '', isUser: false, thinkingProcess: ' '));
+        widget.chatSession.messages.add(ChatMessage(text: '', isUser: false, thinkingProcess: ''));
       });
       _scrollToBottom();
 

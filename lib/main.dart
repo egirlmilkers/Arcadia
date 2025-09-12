@@ -52,7 +52,8 @@ void main() async {
 // ========== TODO ==========
 // - web version
 // - refresh data
-// - chat creates even if ai failed
+// - chat popup menu doesnt work if  not pinned
+// - generate even if switching tabs
 
 // ===== Future Updates =====
 // - gemma
@@ -81,20 +82,21 @@ class ChatMessage {
   /// Whether the message was sent by the user.
   final bool isUser;
 
+  /// The thinking process summary from the AI.
+  String? thinkingProcess;
+
   /// A list of file paths for any attachments.
   final List<String> attachments;
 
   /// The timestamp of when the message was created.
   final DateTime createdAt;
 
-  /// The thinking process summary from the AI.
-  String? thinkingProcess;
 
   ChatMessage({
     required this.text,
     required this.isUser,
-    this.attachments = const [],
     this.thinkingProcess,
+    this.attachments = const [],
     String? id,
     DateTime? createdAt,
   }) : id = id ?? const Uuid().v4(),
@@ -106,9 +108,9 @@ class ChatMessage {
       id: json['id'],
       text: json['text'],
       isUser: json['isUser'],
+      thinkingProcess: json['thinkingProcess'],
       attachments: List<String>.from(json['attachments']),
       createdAt: DateTime.parse(json['createdAt']),
-      thinkingProcess: json['thinkingProcess'],
     );
   }
 
