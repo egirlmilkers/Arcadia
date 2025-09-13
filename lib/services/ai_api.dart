@@ -15,7 +15,8 @@ import 'logging.dart';
 /// handling request cancellation, and processing attachments. It communicates
 /// back to the main isolate via a `SendPort`.
 void _generateContentIsolate(Map<String, dynamic> params) async {
-  print('generateContentIsolate($params)');
+  final Logging logger = params['logger'];
+  logger.dprint(params.toString(), 'generateContentIsolate');
   // Establishes communication channels between the main isolate and this isolate.
   final mainSendPort = params['sendPort'] as SendPort;
   final receivePort = ReceivePort();
@@ -77,7 +78,7 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
 
     // Constructs the API endpoint URL.
     final url = Uri.parse('$modelUrl${src == 'vertex' ? '?key=$apiKey' : ''}');
-    Logging().dprint(url.toString(), 'Parsed URL');
+    print('Parsed URL: $url'); // Use a raw print()
 
     // Prepares the chat history for the API request.
     var history = List.of(messages);
@@ -242,7 +243,7 @@ class AiApi {
     String src,
     [bool? thinking = false]
   ) async {
-    print('generateContent(messages: $messages, url: $url, src: $src, thinking: $thinking)');
+    Logging().dprint('messages: $messages, url: $url, src: $src, thinking: $thinking', 'generateContent');
     final completer = Completer<Map<String, dynamic>>();
     final receivePort = ReceivePort();
 
@@ -250,6 +251,7 @@ class AiApi {
 
     // Spawns the isolate for content generation.
     _isolate = await Isolate.spawn(_generateContentIsolate, {
+      'logger': Logging(),
       'sendPort': receivePort.sendPort,
       'apiKey': apiKey,
       'url': url,

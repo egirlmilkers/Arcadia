@@ -529,9 +529,9 @@ class _ChatUIState extends State<ChatUI> {
                       // Send the message when the user presses Enter without Shift.
                       if (HardwareKeyboard.instance.isLogicalKeyPressed(LogicalKeyboardKey.enter) &&
                           !HardwareKeyboard.instance.isShiftPressed) {
-                        // if (event is KeyDownEvent) {
-                        //   _sendMessage();
-                        // }
+                        if (event is KeyDownEvent) {
+                          _sendMessage();
+                        }
                         return KeyEventResult.handled;
                       }
                       return KeyEventResult.ignored;

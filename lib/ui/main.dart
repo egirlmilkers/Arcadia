@@ -51,15 +51,9 @@ class _MainUIState extends State<MainUI> {
   @override
   void initState() {
     super.initState();
-    _initializeServices();
     _loadChatHistory();
     _loadPinState();
     _startNewChat();
-  }
-
-  /// Initializes the services, including the logging service.
-  Future<void> _initializeServices() async {
-    await Logging.configure();
   }
 
   /// Loads the pinned state of the side navigation bar from shared preferences.

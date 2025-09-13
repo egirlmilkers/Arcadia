@@ -9,8 +9,8 @@ import 'package:uuid/uuid.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-import 'services/model.dart';
 import 'services/logging.dart';
+import 'services/model.dart';
 import 'theme/manager.dart';
 import 'ui/main.dart';
 import 'util.dart';
@@ -21,7 +21,7 @@ void main() async {
   // GoogleFonts.config.allowRuntimeFetching = false;
   WidgetsFlutterBinding.ensureInitialized();
   await windowManager.ensureInitialized();
-  await Logging.configure();
+  await Logging().configure();
 
   final packageInfo = await PackageInfo.fromPlatform();
   appVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
@@ -101,7 +101,7 @@ class ChatMessage {
     String? id,
     DateTime? createdAt,
   }) : id = id ?? const Uuid().v4(),
-       createdAt = createdAt ?? DateTime.now();
+      createdAt = createdAt ?? DateTime.now();
 
   /// Creates a [ChatMessage] from a JSON object.
   factory ChatMessage.fromJson(Map<String, dynamic> json) {

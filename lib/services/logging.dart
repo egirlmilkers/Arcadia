@@ -26,13 +26,13 @@ class Logging {
   }
 
   /// The directory where log files are stored.
-  static late Directory logsDir;
+  late Directory logsDir;
 
   /// Configures the logger to write to a file.
   ///
   /// This method should be called once at application startup. It sets up the
   /// log level and a listener that writes log records to a timestamped file.
-  static Future<void> configure() async {
+  Future<void> configure() async {
     // Set the logging level to record all messages.
     Logger.root.level = Level.ALL;
 
