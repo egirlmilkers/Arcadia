@@ -129,6 +129,10 @@ class _ChatUIState extends State<ChatUI> {
     //
     void revertGivenPrompt() {
       setState(() {
+        if (!widget.chatSession.messages.last.isUser &&
+            widget.chatSession.messages.last.text.trim() == '') {
+          widget.chatSession.messages.removeLast();
+        }
         widget.chatSession.messages.removeLast();
         _textController.text = originalMessage;
         _attachments = originalAttachments;
@@ -138,7 +142,9 @@ class _ChatUIState extends State<ChatUI> {
 
     try {
       final generationConfig = GenerationConfig(
-        thinkingConfig: widget.selectedModel.thinking ? ThinkingConfig(thinkingBudget: -1, includeThoughts: true) : null,
+        thinkingConfig: widget.selectedModel.thinking
+            ? ThinkingConfig(thinkingBudget: -1, includeThoughts: true)
+            : null,
       );
 
       // prepare safety settings
@@ -149,15 +155,23 @@ class _ChatUIState extends State<ChatUI> {
         SafetySetting(HarmCategory.dangerousContent, HarmBlockThreshold.off, null),
       ];
 
+      final ai = widget.selectedModel.vertex
+          ? FirebaseAI.vertexAI()
+          : FirebaseAI.googleAI();
+      _logger.dprint(widget.selectedModel.name, 'Model Name');
+      _logger.dprint(widget.selectedModel.vertex.toString(), 'Uses Vertex');
+      _logger.dprint(generationConfig.thinkingConfig?.thinkingBudget.toString() ?? 'null', 'Thinking Budget');
+      _logger.dprint(generationConfig.thinkingConfig?.includeThoughts.toString() ?? 'null', 'Include Thoughts');
+      _logger.dprint(safetySettings.map((ss) => '${ss.category} = ${ss.threshold}').toList().toString(), 'Safety Settings');
       // generate response with firebase ai
-      final model = FirebaseAI.googleAI().generativeModel(
+      final model = ai.generativeModel(
         model: widget.selectedModel.name,
         generationConfig: generationConfig,
         safetySettings: safetySettings,
       );
 
       // a super quick model that we use to do minimal shit (chat name)
-      final titleModel = FirebaseAI.googleAI().generativeModel(model: 'gemini-1.5-flash');
+      final titleModel = FirebaseAI.googleAI().generativeModel(model: 'gemini-2.5-flash');
 
       // Generate title for new chats
       if (isNewChat) {
@@ -270,7 +284,16 @@ class _ChatUIState extends State<ChatUI> {
         });
         _logger.info('Message stream finished.');
       },
-      onError: (e) {
+      onError: (e, s) {
+        // <-- Catch the error 'e' and stack trace 's'
+        _logger.error('Error in message stream', e, s);
+
+        // THIS IS THE NEW PART TO LOG THE HTML
+        if (e is FormatException) {
+          // The 'source' property of the FormatException contains the response body
+          _logger.dprint(e.source, 'Non-JSON Response');
+        }
+
         if (revertGivenPrompt != null) {
           revertGivenPrompt();
         }
@@ -335,7 +358,9 @@ class _ChatUIState extends State<ChatUI> {
 
     try {
       final generationConfig = GenerationConfig(
-        thinkingConfig: widget.selectedModel.thinking ? ThinkingConfig(thinkingBudget: -1, includeThoughts: true) : null,
+        thinkingConfig: widget.selectedModel.thinking
+            ? ThinkingConfig(thinkingBudget: -1, includeThoughts: true)
+            : null,
       );
 
       // prepare safety settings
@@ -346,8 +371,11 @@ class _ChatUIState extends State<ChatUI> {
         SafetySetting(HarmCategory.dangerousContent, HarmBlockThreshold.off, null),
       ];
 
+      final ai = widget.selectedModel.vertex
+          ? FirebaseAI.vertexAI()
+          : FirebaseAI.googleAI();
       // generate response with firebase ai
-      final model = FirebaseAI.googleAI().generativeModel(
+      final model = ai.generativeModel(
         model: widget.selectedModel.name,
         generationConfig: generationConfig,
         safetySettings: safetySettings,

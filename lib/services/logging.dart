@@ -1,7 +1,7 @@
 import 'dart:io';
 
+import 'package:arcadia/util.dart';
 import 'package:logging/logging.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 
 /// A service to configure and manage logging for the application.
@@ -36,13 +36,7 @@ class Logging {
     Logger.root.level = Level.ALL;
 
     // Get the application's documents directory.
-    final docs = await getApplicationDocumentsDirectory();
-    logsDir = Directory(p.join(docs.path, 'Arcadia', 'logs'));
-
-    // Create the logs directory if it doesn't exist.
-    if (!await logsDir.exists()) {
-      await logsDir.create(recursive: true);
-    }
+    final logsDir = await getArcadiaDocuments('logs');
 
     // Generate a timestamped file name for the log file.
     final timestamp = DateTime.now().toString().replaceAll(RegExp(r'[<>:"/\\|?*]'), '-');
@@ -50,7 +44,11 @@ class Logging {
 
     // Set up a listener to write log records to the file.
     Logger.root.onRecord.listen((record) {
-      final message = '${record.level.name}: ${record.time}: ${record.message}';
+      String message = '${record.level.name}: ${record.time}: ${record.message}';
+      if (record.error != null || record.stackTrace != null) {
+        message +=
+            '\n${record.error ?? 'Stack Trace'}: ${record.stackTrace ?? '[No stack trace received.]'}';
+      }
       // ignore: avoid_print
       print(message); // Also print to console for easy debugging.
       logFile.writeAsStringSync('$message\n', mode: FileMode.append);
@@ -63,12 +61,7 @@ class Logging {
   /// - [message]: The message to be logged.
   /// - [error]: An optional error object to include in the log.
   /// - [stackTrace]: An optional stack trace to include in the log.
-  void log(
-    Level level,
-    String message, [
-    Object? error,
-    StackTrace? stackTrace,
-  ]) {
+  void log(Level level, String message, [Object? error, StackTrace? stackTrace]) {
     _logger.log(level, message, error, stackTrace);
   }
 
@@ -91,5 +84,12 @@ class Logging {
   /// Use this for critical errors that may cause the application to fail.
   void error(String message, [Object? error, StackTrace? stackTrace]) {
     log(Level.SEVERE, message, error, stackTrace);
+  }
+
+  /// Logs an objects data for debugging.
+  /// 
+  /// Use this as an alternative to "print".
+  void dprint(String data, String? name) {
+    log(Level.INFO, '$name: \n$data\n', null, null);
   }
 }

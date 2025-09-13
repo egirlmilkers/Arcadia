@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Represents a Gemini model with its display name, subtitle, and model name.
@@ -22,12 +25,16 @@ class Model {
   /// Whether the model is capable of thinking.
   final bool thinking;
 
+  /// Whether the model should be ran through Vertex API.
+  final bool vertex;
+
   Model({
     required this.displayName,
     required this.subtitle,
     required this.name,
     required this.url,
     this.thinking = false,
+    this.vertex = false,
   });
 
   /// Creates a [Model] from a JSON object.
@@ -38,6 +45,7 @@ class Model {
       name: json['name'],
       url: json['url'],
       thinking: json['thinking'] ?? false,
+      vertex: json['vertex'] ?? false,
     );
   }
 }
@@ -69,6 +77,7 @@ class ModelManager extends ChangeNotifier {
               name: '',
               url: '',
               thinking: false,
+              vertex: false,
             ));
 
   /// Loads the models and settings from their respective sources.
@@ -83,11 +92,21 @@ class ModelManager extends ChangeNotifier {
   Future<void> _loadModels() async {
     try {
       final String string = await rootBundle.loadString('assets/models.json');
-      final List<dynamic> jsonList = json.decode(string);
+      final List<dynamic> jsonList = jsonDecode(string);
       _models = jsonList.map((json) => Model.fromJson(json)).toList();
+      try {
+        final docs = await getApplicationDocumentsDirectory();
+        final String docuString = await File(p.join(docs.path, 'Arcadia', 'models.json')).readAsString();
+        final List<dynamic> docuJsonList = jsonDecode(docuString);
+        _models.addAll(docuJsonList.map((json) => Model.fromJson(json)).toList());
+      }
+      catch (e) {
+        debugPrint('Can\'t process personal models: $e');
+      }
     } catch (e) {
       debugPrint('Error loading models: $e');
     }
+    debugPrint('Loaded Models: ${_models.map((m) => m.displayName)}');
   }
 
   /// Loads the selected model from shared preferences.

@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import 'package:toastification/toastification.dart';
 
@@ -123,4 +126,13 @@ ToastificationItem showCopiedToast(BuildContext context, ColorScheme theme) {
     dragToClose: true,
     borderSide: BorderSide(color: Colors.transparent),
   );
+}
+
+Future<Directory> getArcadiaDocuments(String? subDir) async {  
+  final docs = await getApplicationDocumentsDirectory();
+  final dir = Directory(p.join(docs.path, 'Arcadia', subDir));
+  if (!await dir.exists()) {
+    await dir.create(recursive: true);
+  }
+  return dir;
 }

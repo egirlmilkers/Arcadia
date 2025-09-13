@@ -54,6 +54,9 @@ void main() async {
 // - refresh data
 // - chat popup menu doesnt work if not pinned
 // - generate even if switching tabs
+// - vertex region
+// - stopping issues
+// - chat doesn't update
 
 // ===== Future Updates =====
 // - gemma
@@ -70,6 +73,7 @@ void main() async {
 // - split widgets to files
 // - warning popups with (dont ask again) remembering
 // - allow all files attachment
+// - token count
 
 /// Represents a single message in a chat session.
 class ChatMessage {
