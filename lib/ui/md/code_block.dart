@@ -68,14 +68,9 @@ class _CodeBlockState extends State<CodeBlock> {
             Container(
               decoration: BoxDecoration(
                 color: theme['root']?.backgroundColor,
-                borderRadius: const BorderRadius.vertical(
-                  bottom: Radius.circular(6),
-                ),
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(6)),
               ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 4.0,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -97,9 +92,7 @@ class _CodeBlockState extends State<CodeBlock> {
                     ),
                     tooltip: 'Copy code',
                     onPressed: () {
-                      Clipboard.setData(
-                        ClipboardData(text: widget.code.trim()),
-                      );
+                      Clipboard.setData(ClipboardData(text: widget.code.trim()));
                       showCopiedToast(context, appTheme.colorScheme);
                     },
                   ),
@@ -112,14 +105,10 @@ class _CodeBlockState extends State<CodeBlock> {
             Container(
               decoration: BoxDecoration(
                 color: theme['root']?.backgroundColor,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(6),
-                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
               ),
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(6),
-                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
                 // A scrollbar for horizontally long code.
                 child: Scrollbar(
                   thumbVisibility: true,
@@ -133,12 +122,7 @@ class _CodeBlockState extends State<CodeBlock> {
                       cleanCode(widget.code),
                       language: widget.language,
                       theme: theme,
-                      padding: const EdgeInsets.only(
-                        left: 24,
-                        right: 24,
-                        top: 20,
-                        bottom: 16,
-                      ),
+                      padding: const EdgeInsets.only(left: 24, right: 24, top: 20, bottom: 16),
                       textStyle: const TextStyle(
                         fontFamily: 'GoogleSansCode',
                         fontVariations: [FontVariation('wght', 400.0)],

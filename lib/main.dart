@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:provider/provider.dart';
 import 'package:dynamic_color/dynamic_color.dart';
+import 'package:toastification/toastification.dart';
 import 'package:uuid/uuid.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -28,7 +29,7 @@ void main() async {
   if (Platform.isWindows) {
     // fixes clipboard history flutter bug
     WindowsInjector.instance.injectKeyData();
-    
+
     WindowManager.instance.setMinimumSize(const Size(640, 480));
   }
 
@@ -44,8 +45,13 @@ void main() async {
 }
 
 // ========== TODO ==========
+// - streaming output & thinking (removing dead chats AND reverting)
+// - safety settings
+
 // - web version
 // - refresh data
+// - chat popup menu doesnt work if  not pinned
+// - generate even if switching tabs
 
 // ===== Future Updates =====
 // - gemma
@@ -55,7 +61,6 @@ void main() async {
 // - drag and drop files
 // - view archived chats
 // - personalized starter prompt
-// - streaming output & thinking
 // - action buttons scroll with app bar
 // - selectable syntax themes
 // - table format
@@ -63,6 +68,7 @@ void main() async {
 // - split widgets to files
 // - warning popups with (dont ask again) remembering
 // - allow all files attachment
+// - token count
 
 /// Represents a single message in a chat session.
 class ChatMessage {
@@ -92,7 +98,7 @@ class ChatMessage {
     String? id,
     DateTime? createdAt,
   }) : id = id ?? const Uuid().v4(),
-      createdAt = createdAt ?? DateTime.now();
+       createdAt = createdAt ?? DateTime.now();
 
   /// Creates a [ChatMessage] from a JSON object.
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
@@ -120,7 +126,7 @@ class ChatMessage {
 }
 
 /// Represents a chat session, which contains a list of messages and a title.
-class ChatSession {
+class ArcadiaChat {
   /// A unique identifier for the chat session.
   final String id;
 
@@ -133,26 +139,20 @@ class ChatSession {
   /// The version of the app that this chat was created in.
   final String version;
 
-  ChatSession({
-    String? id,
-    required this.title,
-    required this.messages,
-    required this.version,
-  }) : id = id ?? const Uuid().v4();
+  ArcadiaChat({String? id, required this.title, required this.messages, required this.version})
+    : id = id ?? const Uuid().v4();
 
-  /// Creates a [ChatSession] from a JSON object.
-  factory ChatSession.fromJson(Map<String, dynamic> json) {
-    return ChatSession(
+  /// Creates a [ArcadiaChat] from a JSON object.
+  factory ArcadiaChat.fromJson(Map<String, dynamic> json) {
+    return ArcadiaChat(
       id: json['id'],
       title: json['title'],
-      messages: (json['messages'] as List)
-          .map((message) => ChatMessage.fromJson(message))
-          .toList(),
+      messages: (json['messages'] as List).map((message) => ChatMessage.fromJson(message)).toList(),
       version: json['version'] ?? '1.0.0+1',
     );
   }
 
-  /// Converts the [ChatSession] to a JSON object.
+  /// Converts the [ArcadiaChat] to a JSON object.
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -180,39 +180,33 @@ class Arcadia extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Use a Consumer to listen for changes in the ThemeManager.
-    return Consumer<ThemeManager>(
-      builder: (context, themeManager, child) {
-        // Use a DynamicColorBuilder to get the device's dynamic colors.
-        return DynamicColorBuilder(
-          builder: (lightDynamic, darkDynamic) {
-            // Get the light and dark themes from the ThemeManager.
-            final themeData = themeManager.getTheme(
-              Brightness.light,
-              scheme: lightDynamic,
-            );
-            final darkThemeData = themeManager.getTheme(
-              Brightness.dark,
-              scheme: darkDynamic,
-            );
+    return ToastificationWrapper(
+      child: Consumer<ThemeManager>(
+        builder: (context, themeManager, child) {
+          // Use a DynamicColorBuilder to get the device's dynamic colors.
+          return DynamicColorBuilder(
+            builder: (lightDynamic, darkDynamic) {
+              // Get the light and dark themes from the ThemeManager.
+              final themeData = themeManager.getTheme(Brightness.light, scheme: lightDynamic);
+              final darkThemeData = themeManager.getTheme(Brightness.dark, scheme: darkDynamic);
 
-            // The main MaterialApp widget.
-            return MaterialApp(
-              title: 'Arcadia',
-              theme: themeData.copyWith(
-                textTheme: themeData.textTheme.apply(fontFamily: 'GoogleSans'),
-              ),
-              darkTheme: darkThemeData.copyWith(
-                textTheme: darkThemeData.textTheme.apply(
-                  fontFamily: 'GoogleSans',
+              // The main MaterialApp widget.
+              return MaterialApp(
+                title: 'Arcadia',
+                theme: themeData.copyWith(
+                  textTheme: themeData.textTheme.apply(fontFamily: 'GoogleSans'),
                 ),
-              ),
-              themeMode: themeManager.themeMode,
-              home: const MainUI(),
-              debugShowCheckedModeBanner: false,
-            );
-          },
-        );
-      },
+                darkTheme: darkThemeData.copyWith(
+                  textTheme: darkThemeData.textTheme.apply(fontFamily: 'GoogleSans'),
+                ),
+                themeMode: themeManager.themeMode,
+                home: const MainUI(),
+                debugShowCheckedModeBanner: false,
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

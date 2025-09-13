@@ -30,23 +30,16 @@ class WelcomeUI extends StatelessWidget {
           children: [
             // The main greeting message with a gradient effect.
             ShaderMask(
-                  shaderCallback: (bounds) => LinearGradient(
-                    colors: gradientColors,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ).createShader(bounds),
-                  child: const Text(
-                    "Hello, there",
-                    style: TextStyle(
-                      fontSize: 56,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                )
-                .animate()
-                .fadeIn(delay: 200.ms, duration: 500.ms)
-                .slideY(begin: 0.2),
+              shaderCallback: (bounds) => LinearGradient(
+                colors: gradientColors,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ).createShader(bounds),
+              child: const Text(
+                "Hello, there",
+                style: TextStyle(fontSize: 56, fontWeight: FontWeight.w600, color: Colors.white),
+              ),
+            ).animate().fadeIn(delay: 200.ms, duration: 500.ms).slideY(begin: 0.2),
             // The secondary greeting message.
             Text(
               "How can I help you today?",
@@ -57,39 +50,24 @@ class WelcomeUI extends StatelessWidget {
             const SizedBox(height: 40),
             // The row of suggestion cards.
             Row(
-                  children: [
-                    const Expanded(
-                      child: SuggestionCard(
-                        icon: Icons.code,
-                        text: "Help me code",
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: SuggestionCard(
-                        icon: Icons.edit,
-                        text: "Help me write",
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: SuggestionCard(
-                        icon: Icons.lightbulb_outline,
-                        text: "Give me ideas",
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: SuggestionCard(
-                        icon: Icons.flight_takeoff,
-                        text: "Help me plan",
-                      ),
-                    ),
-                  ],
-                )
-                .animate(delay: 100.ms)
-                .fadeIn(delay: 600.ms, duration: 500.ms)
-                .slideX(begin: 0.2),
+              children: [
+                const Expanded(
+                  child: SuggestionCard(icon: Icons.code, text: "Help me code"),
+                ),
+                const SizedBox(width: 16),
+                const Expanded(
+                  child: SuggestionCard(icon: Icons.edit, text: "Help me write"),
+                ),
+                const SizedBox(width: 16),
+                const Expanded(
+                  child: SuggestionCard(icon: Icons.lightbulb_outline, text: "Give me ideas"),
+                ),
+                const SizedBox(width: 16),
+                const Expanded(
+                  child: SuggestionCard(icon: Icons.flight_takeoff, text: "Help me plan"),
+                ),
+              ],
+            ).animate(delay: 100.ms).fadeIn(delay: 600.ms, duration: 500.ms).slideX(begin: 0.2),
           ],
         ),
       ),

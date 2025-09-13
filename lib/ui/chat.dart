@@ -12,7 +12,6 @@ import 'package:toastification/toastification.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import '../services/logging.dart';
 import 'welcome.dart';
@@ -33,7 +32,7 @@ import 'widgets/thinking_spinner.dart';
 /// Gemini API, and displaying the conversation.
 class ChatUI extends StatefulWidget {
   /// The chat session to be displayed.
-  final ChatSession chatSession;
+  final ArcadiaChat chatSession;
 
   /// The name of the selected model for content generation.
   final model_service.Model selectedModel;
@@ -97,13 +96,7 @@ class _ChatUIState extends State<ChatUI> {
     // Copy attachments to a permanent location to ensure they are not lost.
     final List<String> attachmentPaths = [];
     if (originalAttachments.isNotEmpty) {
-      final docs = await getApplicationDocumentsDirectory();
-      final attachmentsDir = Directory(
-        p.join(docs.path, 'Arcadia', 'attachments'),
-      );
-      if (!await attachmentsDir.exists()) {
-        await attachmentsDir.create(recursive: true);
-      }
+      final attachmentsDir = await getArcadiaDocuments('attachments');
 
       for (final file in originalAttachments) {
         if (file.path != null) {
@@ -112,9 +105,7 @@ class _ChatUIState extends State<ChatUI> {
           attachmentPaths.add(newPath);
         }
       }
-      _logger.info(
-        'Copied ${attachmentPaths.length} attachments to permanent storage.',
-      );
+      _logger.info('Copied ${attachmentPaths.length} attachments to permanent storage.');
     }
 
     // Optimistically update the UI with the user's message.
@@ -130,13 +121,13 @@ class _ChatUIState extends State<ChatUI> {
     final bool isNewChat = widget.chatSession.messages.length == 1;
 
     // A local function to revert the UI if the message fails to send.
-    void revertOptimisticUI() {
+    void revertGivenPrompt() {
       setState(() {
         widget.chatSession.messages.removeLast();
         _textController.text = originalMessage;
         _attachments = originalAttachments;
       });
-      _logger.warning('Reverted optimistic UI update.');
+      _logger.warning('Reverted given prompt.');
     }
 
     try {
@@ -155,11 +146,11 @@ class _ChatUIState extends State<ChatUI> {
         // If it's a new chat, generate a title and content concurrently.
         _logger.info('New chat detected. Generating title and content.');
         final prompt =
-            'Generate a short, concise title (5 words max) for an ai chat started with this user query:\n\n$originalMessage';
+            'Generate a short, concise header (5 words max) for an ai chat started with this user query:\n\n$originalMessage\n\n[Please do not provide anything else, just the 5 word title. This will show up in a list of multiple user chat sessions so it needs to be easily distiniguishable without the need to open the chat.]';
         final titleFuture = titleService.generateContent(
           [ChatMessage(text: prompt, isUser: true)],
           'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
-          thinking: false
+          thinking: false,
         );
 
         final contentFuture = contentService.generateContent(
@@ -174,9 +165,7 @@ class _ChatUIState extends State<ChatUI> {
 
         if (newTitleResponse['error'] == null) {
           setState(() {
-            widget.chatSession.title = newTitleResponse['text']
-                .replaceAll('"', '')
-                .trim();
+            widget.chatSession.title = newTitleResponse['text'].replaceAll('"', '').trim();
           });
           _logger.info('Generated new chat title: ${widget.chatSession.title}');
         } else {
@@ -193,7 +182,7 @@ class _ChatUIState extends State<ChatUI> {
 
       // Handle user cancellation.
       if (modelResponse['text'] == GeminiService.cancelledResponse) {
-        revertOptimisticUI();
+        revertGivenPrompt();
         _logger.info('Message sending cancelled by user.');
         return;
       }
@@ -220,7 +209,7 @@ class _ChatUIState extends State<ChatUI> {
         widget.onNewMessage?.call(widget.chatSession.title);
       }
     } catch (e, s) {
-      revertOptimisticUI();
+      revertGivenPrompt();
       _logger.error('Error sending message', e, s);
 
       // Show an error toast to the user.
@@ -280,10 +269,7 @@ class _ChatUIState extends State<ChatUI> {
     setState(() {
       _isLoading = true;
       // Remove the AI message and any subsequent messages.
-      widget.chatSession.messages.removeRange(
-        messageIndex,
-        widget.chatSession.messages.length,
-      );
+      widget.chatSession.messages.removeRange(messageIndex, widget.chatSession.messages.length);
     });
     _scrollToBottom();
     _logger.info('Regenerating response for message at index $messageIndex.');
@@ -362,9 +348,7 @@ class _ChatUIState extends State<ChatUI> {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
           duration: Duration(
-            milliseconds:
-                duration ??
-                (_scrollController.position.maxScrollExtent / 10).toInt(),
+            milliseconds: duration ?? (_scrollController.position.maxScrollExtent / 10).toInt(),
           ),
           curve: Curves.easeOut,
         );
@@ -400,8 +384,7 @@ class _ChatUIState extends State<ChatUI> {
               ? const WelcomeUI()
               : Align(
                   // Replaced Center with Align
-                  alignment:
-                      Alignment.topCenter, // Aligns the child to the bottom
+                  alignment: Alignment.topCenter, // Aligns the child to the bottom
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 900),
                     // A scrollable column of all messages in the chat session.
@@ -410,12 +393,7 @@ class _ChatUIState extends State<ChatUI> {
                       child: SingleChildScrollView(
                         controller: _scrollController,
                         physics: const ClampingScrollPhysics(),
-                        padding: const EdgeInsets.only(
-                          top: 50,
-                          left: 16,
-                          right: 16,
-                          bottom: 25,
-                        ),
+                        padding: const EdgeInsets.only(top: 50, left: 16, right: 16, bottom: 25),
                         child: Column(
                           children: [
                             for (
@@ -425,22 +403,15 @@ class _ChatUIState extends State<ChatUI> {
                             ) ...[
                               Builder(
                                 builder: (context) {
-                                  final message =
-                                      widget.chatSession.messages[index];
+                                  final message = widget.chatSession.messages[index];
                                   // Determine if the message is the last one from the user or AI.
-                                  final lastUserMessageIndex = widget
-                                      .chatSession
-                                      .messages
+                                  final lastUserMessageIndex = widget.chatSession.messages
                                       .lastIndexWhere((m) => m.isUser);
-                                  final lastAiMessageIndex = widget
-                                      .chatSession
-                                      .messages
+                                  final lastAiMessageIndex = widget.chatSession.messages
                                       .lastIndexWhere((m) => !m.isUser);
 
-                                  final bool isLastUserMessage =
-                                      index == lastUserMessageIndex;
-                                  final bool isLastAiMessage =
-                                      index == lastAiMessageIndex;
+                                  final bool isLastUserMessage = index == lastUserMessageIndex;
+                                  final bool isLastAiMessage = index == lastAiMessageIndex;
 
                                   // Each message is displayed in a MessageBubble.
                                   return MessageBubble(
@@ -449,15 +420,9 @@ class _ChatUIState extends State<ChatUI> {
                                     isLastAiMessage: isLastAiMessage,
                                     onMessageEdited: (newText) {
                                       setState(() {
-                                        widget
-                                                .chatSession
-                                                .messages[index]
-                                                .text =
-                                            newText;
+                                        widget.chatSession.messages[index].text = newText;
                                       });
-                                      _chatHistoryService.saveChat(
-                                        widget.chatSession,
-                                      );
+                                      _chatHistoryService.saveChat(widget.chatSession);
                                     },
                                     onRegenerate: () {
                                       _regenerateResponse(index);
@@ -465,8 +430,7 @@ class _ChatUIState extends State<ChatUI> {
                                   );
                                 },
                               ),
-                              if (index <
-                                  widget.chatSession.messages.length - 1)
+                              if (index < widget.chatSession.messages.length - 1)
                                 const SizedBox(height: 20),
                             ],
                           ],
@@ -557,9 +521,7 @@ class _ChatUIState extends State<ChatUI> {
                   child: Focus(
                     onKeyEvent: (FocusNode node, KeyEvent event) {
                       // Send the message when the user presses Enter without Shift.
-                      if (HardwareKeyboard.instance.isLogicalKeyPressed(
-                            LogicalKeyboardKey.enter,
-                          ) &&
+                      if (HardwareKeyboard.instance.isLogicalKeyPressed(LogicalKeyboardKey.enter) &&
                           !HardwareKeyboard.instance.isShiftPressed) {
                         if (event is KeyDownEvent) {
                           _sendMessage();
@@ -614,10 +576,7 @@ class _ChatUIState extends State<ChatUI> {
     // Center the input area and constrain its width.
     return Align(
       alignment: Alignment.bottomCenter,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 900),
-        child: inputArea,
-      ),
+      child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 900), child: inputArea),
     );
   }
 }
@@ -633,11 +592,7 @@ class AttachmentView extends StatefulWidget {
   /// A callback function that is called when an attachment is removed.
   final Function(int)? onAttachmentRemoved;
 
-  const AttachmentView({
-    super.key,
-    required this.attachments,
-    this.onAttachmentRemoved,
-  });
+  const AttachmentView({super.key, required this.attachments, this.onAttachmentRemoved});
 
   @override
   State<AttachmentView> createState() => _AttachmentViewState();
@@ -728,11 +683,7 @@ class _AttachmentViewState extends State<AttachmentView> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Flexible(
-                          child: Text(
-                            fileName,
-                            overflow: TextOverflow.fade,
-                            softWrap: false,
-                          ),
+                          child: Text(fileName, overflow: TextOverflow.fade, softWrap: false),
                         ),
                         Text(fileExt),
                       ],
@@ -788,8 +739,7 @@ class MessageBubble extends StatefulWidget {
   State<MessageBubble> createState() => _MessageBubbleState();
 }
 
-class _MessageBubbleState extends State<MessageBubble>
-    with AutomaticKeepAliveClientMixin {
+class _MessageBubbleState extends State<MessageBubble> with AutomaticKeepAliveClientMixin {
   late final bool _isLongMessage;
   late bool _isExpanded;
   static const int _maxLength = 300;
@@ -832,9 +782,7 @@ class _MessageBubbleState extends State<MessageBubble>
 
     // Show action buttons on hover or for the last message in the chat.
     final bool shouldShowButtons =
-        (isUser && widget.isLastUserMessage) ||
-        (!isUser && widget.isLastAiMessage) ||
-        _isHovering;
+        (isUser && widget.isLastUserMessage) || (!isUser && widget.isLastAiMessage) || _isHovering;
 
     if (_isEditing) {
       return _buildEditingView(context);
@@ -847,9 +795,7 @@ class _MessageBubbleState extends State<MessageBubble>
       child: Align(
         alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
         child: Column(
-          crossAxisAlignment: isUser
-              ? CrossAxisAlignment.end
-              : CrossAxisAlignment.start,
+          crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             // Display attachments if they exist.
             if (widget.message.attachments.isNotEmpty)
@@ -863,14 +809,9 @@ class _MessageBubbleState extends State<MessageBubble>
                 left: isUser ? 40.0 : 0.0,
                 right: isUser ? 0.0 : 40.0,
               ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12.0,
-                vertical: 10.0,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
               decoration: BoxDecoration(
-                color: isUser
-                    ? theme.colorScheme.secondary
-                    : Colors.transparent,
+                color: isUser ? theme.colorScheme.secondary : Colors.transparent,
                 borderRadius: isUser
                     ? const BorderRadius.only(
                         topLeft: Radius.circular(20),
@@ -886,9 +827,7 @@ class _MessageBubbleState extends State<MessageBubble>
                       ),
               ),
               constraints: BoxConstraints(
-                maxWidth: isUser
-                    ? 500
-                    : MediaQuery.of(context).size.width * 0.75,
+                maxWidth: isUser ? 500 : MediaQuery.of(context).size.width * 0.75,
                 minWidth: 150,
               ),
               child: Row(
@@ -914,8 +853,7 @@ class _MessageBubbleState extends State<MessageBubble>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Display the thinking process if it exists.
-                        if (!isUser &&
-                            widget.message.thinkingProcess != null) ...[
+                        if (!isUser && widget.message.thinkingProcess != null) ...[
                           _buildThinkingProcess(context),
                         ],
                         // The message text, rendered as Markdown.
@@ -1088,11 +1026,7 @@ class _MessageBubbleState extends State<MessageBubble>
               // Regenerate button for AI messages.
               Tooltip(
                 message: 'Regenerate',
-                child: _buildIconButton(
-                  context,
-                  Icons.refresh_outlined,
-                  widget.onRegenerate,
-                ),
+                child: _buildIconButton(context, Icons.refresh_outlined, widget.onRegenerate),
               ),
             ],
     );

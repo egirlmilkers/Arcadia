@@ -118,10 +118,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 children: [
                   if (icon != null) Icon(icon, size: 24),
                   const SizedBox(height: 4),
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
+                  Text(title, style: Theme.of(context).textTheme.headlineMedium),
                 ],
               ),
               content: SizedBox(
@@ -175,16 +172,11 @@ class _SettingsPageState extends State<SettingsPage> {
               obscureText: true,
               maxLines: 1,
               autofocus: true,
-              decoration: const InputDecoration(
-                hintText: 'Enter your Gemini API Key',
-              ),
+              decoration: const InputDecoration(hintText: 'Enter your Gemini API Key'),
             ),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
             TextButton(
               onPressed: () {
                 _saveApiKey(controller.text);
@@ -207,13 +199,8 @@ class _SettingsPageState extends State<SettingsPage> {
         return Scaffold(
           // The app bar for the settings page.
           appBar: AppBar(
-            title: const Text(
-              'Settings',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-            backgroundColor: Theme.of(
-              context,
-            ).colorScheme.surfaceContainerLowest,
+            title: const Text('Settings', style: TextStyle(fontWeight: FontWeight.w700)),
+            backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
           ),
           // The main body of the settings page.
           body: Center(
@@ -262,23 +249,13 @@ class _SettingsPageState extends State<SettingsPage> {
                     enabled: customStyleAllowed,
                     subtitle: SegmentedButton<ContrastLevel>(
                       segments: const [
-                        ButtonSegment(
-                          value: ContrastLevel.standard,
-                          label: Text('Default'),
-                        ),
-                        ButtonSegment(
-                          value: ContrastLevel.medium,
-                          label: Text('Medium'),
-                        ),
-                        ButtonSegment(
-                          value: ContrastLevel.high,
-                          label: Text('High'),
-                        ),
+                        ButtonSegment(value: ContrastLevel.standard, label: Text('Default')),
+                        ButtonSegment(value: ContrastLevel.medium, label: Text('Medium')),
+                        ButtonSegment(value: ContrastLevel.high, label: Text('High')),
                       ],
                       selected: {themeManager.contrastLevel},
                       onSelectionChanged: customStyleAllowed
-                          ? (selection) =>
-                                themeManager.setContrastLevel(selection.first)
+                          ? (selection) => themeManager.setContrastLevel(selection.first)
                           : null,
                     ),
                   ),
@@ -286,9 +263,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   // The setting for dynamic color.
                   SwitchListTile(
                     title: Text(_dynamicColorLabel),
-                    subtitle: const Text(
-                      'Use colors from your system\'s theme',
-                    ),
+                    subtitle: const Text('Use colors from your system\'s theme'),
                     value: themeManager.useDynamicColor,
                     onChanged: themeManager.dynamicColorAvailable
                         ? (value) => themeManager.setDynamicColor(value)
@@ -338,10 +313,7 @@ class SettingsHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Text(
         title,
-        style: TextStyle(
-          color: Theme.of(context).colorScheme.primary,
-          fontWeight: FontWeight.w900,
-        ),
+        style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w900),
       ),
     );
   }
@@ -373,10 +345,7 @@ class SettingsListTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
-      subtitle: Text(
-        subtitle,
-        style: const TextStyle(fontWeight: FontWeight.w300),
-      ),
+      subtitle: Text(subtitle, style: const TextStyle(fontWeight: FontWeight.w300)),
       onTap: onTap,
       enabled: enabled,
     );

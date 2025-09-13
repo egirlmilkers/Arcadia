@@ -14,17 +14,13 @@ class ThinkingSpinner extends StatefulWidget {
   State<ThinkingSpinner> createState() => _ThinkingSpinnerState();
 }
 
-class _ThinkingSpinnerState extends State<ThinkingSpinner>
-    with SingleTickerProviderStateMixin {
+class _ThinkingSpinnerState extends State<ThinkingSpinner> with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat();
+    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat();
   }
 
   @override
@@ -47,9 +43,7 @@ class _ThinkingSpinnerState extends State<ThinkingSpinner>
           turns: _controller,
           child: CustomPaint(
             painter: GradientCirclePainter(
-              gradientColors:
-                  gradient ??
-                  [scheme.primary, scheme.secondary, scheme.tertiary],
+              gradientColors: gradient ?? [scheme.primary, scheme.secondary, scheme.tertiary],
             ),
             child: const SizedBox(width: 24, height: 24),
           ),
@@ -76,11 +70,7 @@ class GradientCirclePainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     final Rect rect = Rect.fromLTWH(0, 0, size.width, size.height);
-    final gradient = SweepGradient(
-      colors: gradientColors,
-      startAngle: 0.0,
-      endAngle: math.pi * 2,
-    );
+    final gradient = SweepGradient(colors: gradientColors, startAngle: 0.0, endAngle: math.pi * 2);
 
     paint.shader = gradient.createShader(rect);
 
@@ -106,15 +96,10 @@ class ThemeGradient extends ThemeExtension<ThemeGradient> {
   }
 
   @override
-  ThemeExtension<ThemeGradient> lerp(
-    ThemeExtension<ThemeGradient>? other,
-    double t,
-  ) {
+  ThemeExtension<ThemeGradient> lerp(ThemeExtension<ThemeGradient>? other, double t) {
     if (other is! ThemeGradient) {
       return this;
     }
-    return ThemeGradient(
-      gradientColors: gradientColors,
-    );
+    return ThemeGradient(gradientColors: gradientColors);
   }
 }

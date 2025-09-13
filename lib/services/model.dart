@@ -1,9 +1,13 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../util.dart';
 
 /// Represents a Gemini model with its display name, subtitle, and model name.
 class Model {
@@ -63,13 +67,7 @@ class ModelManager extends ChangeNotifier {
       _selectedModel ??
       (_models.isNotEmpty
           ? _models.first
-          : Model(
-              displayName: '',
-              subtitle: '',
-              name: '',
-              url: '',
-              thinking: false,
-            ));
+          : Model(displayName: '', subtitle: '', name: '', url: '', thinking: false));
 
   /// Loads the models and settings from their respective sources.
   Future<void> _load() async {
@@ -83,11 +81,20 @@ class ModelManager extends ChangeNotifier {
   Future<void> _loadModels() async {
     try {
       final String string = await rootBundle.loadString('assets/models.json');
-      final List<dynamic> jsonList = json.decode(string);
+      final List<dynamic> jsonList = jsonDecode(string);
       _models = jsonList.map((json) => Model.fromJson(json)).toList();
+      try {
+        final docs = await getArcadiaDocuments();
+        final String docuString = await File(p.join(docs.path, 'models.json')).readAsString();
+        final List<dynamic> docuJsonList = jsonDecode(docuString);
+        _models.addAll(docuJsonList.map((json) => Model.fromJson(json)).toList());
+      } catch (e) {
+        debugPrint('Can\'t process personal models: $e');
+      }
     } catch (e) {
       debugPrint('Error loading models: $e');
     }
+    debugPrint('Loaded Models: ${_models.map((m) => m.displayName)}');
   }
 
   /// Loads the selected model from shared preferences.

@@ -37,10 +37,7 @@ class ThemeManager extends ChangeNotifier {
   // A convenient getter for the full current theme object
   AppTheme? get currentTheme {
     if (_themes.isEmpty) return null;
-    return _themes.firstWhere(
-      (t) => t.name == _selectedTheme,
-      orElse: () => _themes.first,
-    );
+    return _themes.firstWhere((t) => t.name == _selectedTheme, orElse: () => _themes.first);
   }
 
   Future<void> _load() async {
@@ -54,9 +51,7 @@ class ThemeManager extends ChangeNotifier {
   Future<void> _loadThemes() async {
     try {
       final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
-      final assets = manifest.listAssets().where(
-        (path) => path.startsWith('assets/themes/'),
-      );
+      final assets = manifest.listAssets().where((path) => path.startsWith('assets/themes/'));
 
       final List<AppTheme> loadedThemes = [];
       for (final path in assets) {
@@ -72,13 +67,11 @@ class ThemeManager extends ChangeNotifier {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    _themeMode =
-        ThemeMode.values[prefs.getInt('themeMode') ?? ThemeMode.system.index];
+    _themeMode = ThemeMode.values[prefs.getInt('themeMode') ?? ThemeMode.system.index];
     _selectedTheme =
-        prefs.getString('selectedTheme') ??
-        (_themes.isNotEmpty ? _themes.first.name : 'Gemini');
-    _contrastLevel = ContrastLevel
-        .values[prefs.getInt('contrastLevel') ?? ContrastLevel.standard.index];
+        prefs.getString('selectedTheme') ?? (_themes.isNotEmpty ? _themes.first.name : 'Gemini');
+    _contrastLevel =
+        ContrastLevel.values[prefs.getInt('contrastLevel') ?? ContrastLevel.standard.index];
     _useDynamicColor = prefs.getBool('useDynamicColor') ?? false;
   }
 
@@ -121,8 +114,7 @@ class ThemeManager extends ChangeNotifier {
   ThemeData _getThemeData(ColorScheme scheme) {
     final theme = currentTheme;
     final gradientColors =
-        theme?.gradientColors ??
-        [scheme.primary, scheme.secondary, scheme.tertiary];
+        theme?.gradientColors ?? [scheme.primary, scheme.secondary, scheme.tertiary];
 
     return ThemeData(
       useMaterial3: true,
@@ -141,11 +133,7 @@ class ThemeManager extends ChangeNotifier {
     final selected = currentTheme;
     if (selected == null) {
       // Safe fallback if no themes are loaded
-      return ThemeData(
-        brightness: brightness,
-        useMaterial3: true,
-        fontFamily: 'GoogleSans',
-      );
+      return ThemeData(brightness: brightness, useMaterial3: true, fontFamily: 'GoogleSans');
     }
 
     if (brightness == Brightness.dark) {

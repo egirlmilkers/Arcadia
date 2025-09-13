@@ -33,10 +33,7 @@ class AppTheme {
   // Create an AppTheme from JSON
   factory AppTheme.fromJson(Map<String, dynamic> json) {
     // Helper for parsing a ColorScheme from JSON
-    ColorScheme colorSchemeFromJson(
-      Map<String, dynamic> schemeJson,
-      bool light,
-    ) {
+    ColorScheme colorSchemeFromJson(Map<String, dynamic> schemeJson, bool light) {
       return ColorScheme(
         brightness: light ? Brightness.light : Brightness.dark,
         primary: _colorFromHex(schemeJson['primary']),
@@ -68,32 +65,22 @@ class AppTheme {
         primaryFixed: _colorFromHex(schemeJson['primaryFixed']),
         onPrimaryFixed: _colorFromHex(schemeJson['onPrimaryFixed']),
         primaryFixedDim: _colorFromHex(schemeJson['primaryFixedDim']),
-        onPrimaryFixedVariant: _colorFromHex(
-          schemeJson['onPrimaryFixedVariant'],
-        ),
+        onPrimaryFixedVariant: _colorFromHex(schemeJson['onPrimaryFixedVariant']),
         secondaryFixed: _colorFromHex(schemeJson['secondaryFixed']),
         onSecondaryFixed: _colorFromHex(schemeJson['onSecondaryFixed']),
         secondaryFixedDim: _colorFromHex(schemeJson['secondaryFixedDim']),
-        onSecondaryFixedVariant: _colorFromHex(
-          schemeJson['onSecondaryFixedVariant'],
-        ),
+        onSecondaryFixedVariant: _colorFromHex(schemeJson['onSecondaryFixedVariant']),
         tertiaryFixed: _colorFromHex(schemeJson['tertiaryFixed']),
         onTertiaryFixed: _colorFromHex(schemeJson['onTertiaryFixed']),
         tertiaryFixedDim: _colorFromHex(schemeJson['tertiaryFixedDim']),
-        onTertiaryFixedVariant: _colorFromHex(
-          schemeJson['onTertiaryFixedVariant'],
-        ),
+        onTertiaryFixedVariant: _colorFromHex(schemeJson['onTertiaryFixedVariant']),
         surfaceDim: _colorFromHex(schemeJson['surfaceDim']),
         surfaceBright: _colorFromHex(schemeJson['surfaceBright']),
-        surfaceContainerLowest: _colorFromHex(
-          schemeJson['surfaceContainerLowest'],
-        ),
+        surfaceContainerLowest: _colorFromHex(schemeJson['surfaceContainerLowest']),
         surfaceContainerLow: _colorFromHex(schemeJson['surfaceContainerLow']),
         surfaceContainer: _colorFromHex(schemeJson['surfaceContainer']),
         surfaceContainerHigh: _colorFromHex(schemeJson['surfaceContainerHigh']),
-        surfaceContainerHighest: _colorFromHex(
-          schemeJson['surfaceContainerHighest'],
-        ),
+        surfaceContainerHighest: _colorFromHex(schemeJson['surfaceContainerHighest']),
       );
     }
 

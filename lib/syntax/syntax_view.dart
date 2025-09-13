@@ -50,9 +50,7 @@ class SyntaxView extends StatelessWidget {
         );
       } else if (node.children != null) {
         List<TextSpan> tmp = [];
-        currentSpans.add(
-          TextSpan(children: tmp, style: theme[node.className!]),
-        );
+        currentSpans.add(TextSpan(children: tmp, style: theme[node.className!]));
         stack.add(currentSpans);
         currentSpans = tmp;
 
@@ -92,9 +90,7 @@ class SyntaxView extends StatelessWidget {
       child: SelectableText.rich(
         TextSpan(
           style: style,
-          children: _convert(
-            highlight.parse(source, language: language).nodes!,
-          ),
+          children: _convert(highlight.parse(source, language: language).nodes!),
         ),
       ),
     );
