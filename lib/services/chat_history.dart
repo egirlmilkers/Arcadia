@@ -13,8 +13,6 @@ import 'logging.dart';
 /// This service handles all file system operations related to chat history,
 /// ensuring that chat data is persisted across application launches.
 class ChatHistoryService {
-  final Logging _logger = Logging();
-
   /// Returns the directory where chat files are stored.
   ///
   /// If the directory does not exist, it will be created.
@@ -22,7 +20,7 @@ class ChatHistoryService {
     final chatsDir = await getArcadiaDocuments('chats');
     if (!await chatsDir.exists()) {
       await chatsDir.create(recursive: true);
-      _logger.info('Created chats directory at ${chatsDir.path}');
+      Logging().info('Created chats directory at ${chatsDir.path}');
     }
     return chatsDir;
   }
@@ -44,15 +42,15 @@ class ChatHistoryService {
           final json = jsonDecode(content);
           chats.add(ArcadiaChat.fromJson(json));
         } catch (e, s) {
-          _logger.error('Error loading chat file: ${file.path}', e, s);
+          Logging().error('Error loading chat file: ${file.path}', e, s);
         }
       }
       // Sort chats by last modified date in descending order.
       chats.sort((a, b) => b.lastModified.compareTo(a.lastModified));
-      _logger.info('Loaded ${chats.length} chats.');
+      Logging().info('Loaded ${chats.length} chats.');
       return chats;
     } catch (e, s) {
-      _logger.error('Error loading chats', e, s);
+      Logging().error('Error loading chats', e, s);
       return [];
     }
   }
@@ -66,9 +64,9 @@ class ChatHistoryService {
       final chatsDir = await _getChatsDirectory();
       final file = File(p.join(chatsDir.path, '${chat.id}.json'));
       await file.writeAsString(jsonEncode(chat.toJson()));
-      _logger.info('Saved chat with ID: ${chat.id}');
+      Logging().info('Saved chat with ID: ${chat.id}');
     } catch (e, s) {
-      _logger.error('Error saving chat with ID: ${chat.id}', e, s);
+      Logging().error('Error saving chat with ID: ${chat.id}', e, s);
     }
   }
 
@@ -81,10 +79,10 @@ class ChatHistoryService {
       final file = File(p.join(chatsDir.path, '${chat.id}.json'));
       if (await file.exists()) {
         await file.delete();
-        _logger.info('Deleted chat with ID: ${chat.id}');
+        Logging().info('Deleted chat with ID: ${chat.id}');
       }
     } catch (e, s) {
-      _logger.error('Error deleting chat with ID: ${chat.id}', e, s);
+      Logging().error('Error deleting chat with ID: ${chat.id}', e, s);
     }
   }
 
@@ -94,7 +92,7 @@ class ChatHistoryService {
   Future<void> renameChat(ArcadiaChat chat, String newTitle) async {
     chat.title = newTitle;
     await saveChat(chat);
-    _logger.info('Renamed chat with ID: ${chat.id} to "$newTitle"');
+    Logging().info('Renamed chat with ID: ${chat.id} to "$newTitle"');
   }
 
   /// Archives a chat session.
@@ -106,16 +104,16 @@ class ChatHistoryService {
       final archiveDir = Directory(p.join(chatsDir.path, 'archived'));
       if (!await archiveDir.exists()) {
         await archiveDir.create(recursive: true);
-        _logger.info('Created archive directory at ${archiveDir.path}');
+        Logging().info('Created archive directory at ${archiveDir.path}');
       }
 
       final file = File(p.join(chatsDir.path, '${chat.id}.json'));
       if (await file.exists()) {
         await file.rename(p.join(archiveDir.path, '${chat.id}.json'));
-        _logger.info('Archived chat with ID: ${chat.id}');
+        Logging().info('Archived chat with ID: ${chat.id}');
       }
     } catch (e, s) {
-      _logger.error('Error archiving chat with ID: ${chat.id}', e, s);
+      Logging().error('Error archiving chat with ID: ${chat.id}', e, s);
     }
   }
 

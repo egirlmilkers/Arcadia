@@ -15,7 +15,7 @@ class Logging {
   static final Logging _instance = Logging._internal();
 
   /// The logger instance.
-  static final Logger _logger = Logger('ArcadiaLogger');
+  final Logger _logger = Logger('ArcadiaLogger');
 
   /// Private constructor for the singleton pattern.
   Logging._internal();
@@ -91,6 +91,6 @@ class Logging {
   ///
   /// Use this as an alternative to "print".
   void dprint(String data, String? name) {
-    log(Level.INFO, '$name: \n$data\n', null, null);
+    info('$name: \n$data\n');
   }
 }

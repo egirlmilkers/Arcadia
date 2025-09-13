@@ -9,7 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../util.dart';
 
-/// Represents a Gemini model with its display name, subtitle, and model name.
+/// Represents an AI model with its display name, subtitle, and model name.
 class Model {
   /// The name of the model to be displayed in the UI.
   final String displayName;
@@ -26,12 +26,16 @@ class Model {
   /// Whether the model is capable of thinking.
   final bool thinking;
 
+  /// The name of the api key reference.
+  final String apiSrc;
+
   Model({
     required this.displayName,
     required this.subtitle,
     required this.name,
     required this.url,
     this.thinking = false,
+    required this.apiSrc,
   });
 
   /// Creates a [Model] from a JSON object.
@@ -42,6 +46,7 @@ class Model {
       name: json['name'],
       url: json['url'],
       thinking: json['thinking'] ?? false,
+      apiSrc: json['src'],
     );
   }
 }
@@ -67,7 +72,14 @@ class ModelManager extends ChangeNotifier {
       _selectedModel ??
       (_models.isNotEmpty
           ? _models.first
-          : Model(displayName: '', subtitle: '', name: '', url: '', thinking: false));
+          : Model(
+              displayName: '',
+              subtitle: '',
+              name: '',
+              url: '',
+              thinking: false,
+              apiSrc: '',
+            ));
 
   /// Loads the models and settings from their respective sources.
   Future<void> _load() async {

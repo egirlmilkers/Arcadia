@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -12,6 +13,19 @@ import '../services/logging.dart';
 import '../theme/manager.dart';
 import '../util.dart';
 
+/// A data class for storing named API keys.
+class ApiKey {
+  String name;
+  String key;
+
+  ApiKey({required this.name, required this.key});
+
+  Map<String, dynamic> toJson() => {'name': name, 'key': key};
+
+  factory ApiKey.fromJson(Map<String, dynamic> json) =>
+      ApiKey(name: json['name'] as String, key: json['key'] as String);
+}
+
 /// A page for displaying and managing application settings.
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -24,31 +38,48 @@ class _SettingsPageState extends State<SettingsPage> {
   String _version = '...';
   String _platformInfo = '...';
   String _dynamicColorLabel = 'Dynamic Color';
-  String? _apiKey;
+
+  List<ApiKey> _apiKeys = [];
 
   @override
   void initState() {
     super.initState();
     _initAppInfo();
-    _loadApiKey();
+    _loadApiKeys();
   }
 
-  /// Loads the Gemini API key from shared preferences.
-  Future<void> _loadApiKey() async {
+  /// Loads the list of API keys from shared preferences.
+  Future<void> _loadApiKeys() async {
     final prefs = await SharedPreferences.getInstance();
+    final keysJson = prefs.getString('api_keys');
+    var loadedKeys = <ApiKey>[];
+
+    if (keysJson != null && keysJson.isNotEmpty) {
+      try {
+        final List<dynamic> decoded = jsonDecode(keysJson);
+        loadedKeys = decoded.map((e) => ApiKey.fromJson(e)).toList();
+      } catch (e, s) {
+        Logging().error('Failed to decode API keys', e, s);
+      }
+    }
+
+    // Ensure the default Gemini key always exists.
+    if (!loadedKeys.any((k) => k.name == 'Gemini')) {
+      loadedKeys.insert(0, ApiKey(name: 'Gemini', key: ''));
+    }
+
     setState(() {
-      _apiKey = prefs.getString('gemini_api_key');
+      _apiKeys = loadedKeys;
     });
+
+    await _saveApiKeys();
   }
 
-  /// Saves the Gemini API key to shared preferences.
-  Future<void> _saveApiKey(String apiKey) async {
+  /// Saves the full list of API keys to shared preferences.
+  Future<void> _saveApiKeys() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('gemini_api_key', apiKey);
-    setState(() {
-      _apiKey = apiKey;
-    });
-    Logging().info('Saved new API key.');
+    final keysJson = jsonEncode(_apiKeys.map((k) => k.toJson()).toList());
+    await prefs.setString('api_keys', keysJson);
   }
 
   /// Initializes the application information, such as version and platform details.
@@ -110,45 +141,171 @@ class _SettingsPageState extends State<SettingsPage> {
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            T? currentSelection = selection;
-            return AlertDialog(
-              title: Column(
-                children: [
-                  if (icon != null) Icon(icon, size: 24),
-                  const SizedBox(height: 4),
-                  Text(title, style: Theme.of(context).textTheme.headlineMedium),
-                ],
+        return AlertDialog(
+          title: Column(
+            children: [
+              if (icon != null) Icon(icon, size: 24),
+              const SizedBox(height: 4),
+              Text(title, style: Theme.of(context).textTheme.headlineMedium),
+            ],
+          ),
+          content: SizedBox(
+            width: double.minPositive,
+            child: RadioGroup<T>(
+              groupValue: selection,
+              onChanged: (T? value) {
+                if (value != null) {
+                  onSelected(value);
+                  Navigator.of(dialogContext).pop();
+                }
+              },
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: options.length,
+                itemBuilder: (context, index) {
+                  final option = options[index];
+                  return RadioListTile<T>(title: Text(optionLabelBuilder(option)), value: option);
+                },
               ),
-              content: SizedBox(
-                width: double.minPositive,
-                child: RadioGroup<T>(
-                  groupValue: currentSelection,
-                  onChanged: (T? value) {
-                    if (value != null) {
-                      onSelected(value);
-                      Navigator.of(dialogContext).pop();
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Shows a dialog to add or edit an API key.
+  Future<void> _showAddOrEditApiKeyDialog({ApiKey? existingApiKey}) async {
+    final isEditing = existingApiKey != null;
+    final nameController = TextEditingController(text: existingApiKey?.name ?? '');
+    final keyController = TextEditingController(text: existingApiKey?.key ?? '');
+    final formKey = GlobalKey<FormState>();
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(isEditing ? 'Edit API Key' : 'Add API Key'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nameController,
+                  autofocus: true,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                  enabled: existingApiKey?.name != 'Gemini',
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) return 'Name cannot be empty';
+                    if (!isEditing &&
+                        _apiKeys.any((k) => k.name.toLowerCase() == value.trim().toLowerCase())) {
+                      return 'This name already exists';
                     }
+                    return null;
                   },
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: options.length,
-                    itemBuilder: (context, index) {
-                      final option = options[index];
-                      return RadioListTile<T>(
-                        title: Text(optionLabelBuilder(option)),
-                        value: option,
-                      );
-                    },
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: keyController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Key',
+                    hintText: 'Enter your API key',
                   ),
                 ),
-              ),
-              actions: <Widget>[
-                TextButton(
-                  child: const Text('Cancel'),
-                  onPressed: () => Navigator.of(dialogContext).pop(),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  final name = nameController.text.trim();
+                  final key = keyController.text.trim();
+                  setState(() {
+                    if (isEditing) {
+                      existingApiKey.key = key;
+                    } else {
+                      _apiKeys.add(ApiKey(name: name, key: key));
+                    }
+                  });
+                  _saveApiKeys();
+                  Navigator.of(context).pop();
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Shows the main dialog for managing all API keys.
+  void _showApiKeyManagementDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('API Keys'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _apiKeys.length,
+                  itemBuilder: (context, index) {
+                    final apiKey = _apiKeys[index];
+                    final isDefault = apiKey.name == 'Gemini';
+
+                    return ListTile(
+                      title: Text(apiKey.name),
+                      subtitle: Text(
+                        apiKey.key.isNotEmpty && apiKey.key.length > 4
+                            ? '••••••••${apiKey.key.substring(apiKey.key.length - 4)}'
+                            : 'Not set',
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined),
+                            tooltip: 'Edit',
+                            onPressed: () async {
+                              await _showAddOrEditApiKeyDialog(existingApiKey: apiKey);
+                              setDialogState(() {}); // Rebuild list after editing
+                            },
+                          ),
+                          if (!isDefault)
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                              tooltip: 'Delete',
+                              onPressed: () => _confirmDeleteApiKey(apiKey, setDialogState),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () async {
+                    await _showAddOrEditApiKeyDialog();
+                    setDialogState(() {});
+                  },
+                  child: const Text('Add New'),
+                ),
+                TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Done')),
               ],
             );
           },
@@ -157,36 +314,31 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  /// Shows a dialog for setting the Gemini API key.
-  void _showApiKeyDialog() {
-    final controller = TextEditingController();
+  /// Shows a confirmation dialog before deleting an API key.
+  void _confirmDeleteApiKey(ApiKey apiKey, StateSetter setDialogState) {
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Set API Key'),
-          content: SizedBox(
-            width: 300,
-            child: TextField(
-              controller: controller,
-              obscureText: true,
-              maxLines: 1,
-              autofocus: true,
-              decoration: const InputDecoration(hintText: 'Enter your Gemini API Key'),
-            ),
+      builder: (deleteContext) => AlertDialog(
+        title: const Text('Delete Key?'),
+        content: Text('Are you sure you want to delete the key named "${apiKey.name}"?'),
+        actions: [
+          TextButton(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.of(deleteContext).pop(),
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-            TextButton(
-              onPressed: () {
-                _saveApiKey(controller.text);
-                Navigator.of(context).pop();
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
+          TextButton(
+            child: const Text('Delete'),
+            onPressed: () {
+              setState(() {
+                _apiKeys.removeWhere((k) => k.name == apiKey.name);
+              });
+              _saveApiKeys();
+              Navigator.of(deleteContext).pop();
+              setDialogState(() {});
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -197,22 +349,17 @@ class _SettingsPageState extends State<SettingsPage> {
         final bool customStyleAllowed = !themeManager.useDynamicColor;
 
         return Scaffold(
-          // The app bar for the settings page.
           appBar: AppBar(
             title: const Text('Settings', style: TextStyle(fontWeight: FontWeight.w700)),
             backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
           ),
-          // The main body of the settings page.
           body: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 800),
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 children: [
-                  // The "Appearance" section.
                   const SettingsHeader('Appearance'),
-
-                  // The setting for the app theme.
                   SettingsListTile(
                     title: 'App theme',
                     subtitle: themeManager.themeMode.name.capitalize(),
@@ -226,8 +373,6 @@ class _SettingsPageState extends State<SettingsPage> {
                       onSelected: (m) => themeManager.setThemeMode(m),
                     ),
                   ),
-
-                  // The setting for the color style.
                   SettingsListTile(
                     title: 'Style',
                     subtitle: themeManager.selectedTheme,
@@ -242,8 +387,6 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                     enabled: customStyleAllowed,
                   ),
-
-                  // The setting for the contrast level.
                   ListTile(
                     title: const Text('Contrast level'),
                     enabled: customStyleAllowed,
@@ -259,8 +402,6 @@ class _SettingsPageState extends State<SettingsPage> {
                           : null,
                     ),
                   ),
-
-                  // The setting for dynamic color.
                   SwitchListTile(
                     title: Text(_dynamicColorLabel),
                     subtitle: const Text('Use colors from your system\'s theme'),
@@ -269,28 +410,17 @@ class _SettingsPageState extends State<SettingsPage> {
                         ? (value) => themeManager.setDynamicColor(value)
                         : null,
                   ),
-
                   const Divider(height: 24),
-
-                  // The "API" section.
                   const SettingsHeader('API'),
-                  // The setting for the Gemini API key.
                   SettingsListTile(
-                    title: 'Gemini API Key',
-                    subtitle: _apiKey != null && _apiKey!.length > 4
-                        ? '••••••••${_apiKey!.substring(_apiKey!.length - 4)}'
-                        : 'Not set',
-                    onTap: _showApiKeyDialog,
+                    title: 'Manage API Keys',
+                    subtitle: '${_apiKeys.length} key${_apiKeys.length > 1 ? 's' : ''} stored',
+                    onTap: _showApiKeyManagementDialog,
                   ),
-
                   const Divider(height: 24),
-
-                  // The "About" section.
                   const SettingsHeader('About'),
-                  // The version and platform information.
                   SettingsListTile(title: 'Version', subtitle: _version),
                   SettingsListTile(title: 'Platform', subtitle: _platformInfo),
-
                   const SizedBox(height: 16),
                 ],
               ),

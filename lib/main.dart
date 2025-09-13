@@ -47,6 +47,8 @@ void main() async {
 // ========== TODO ==========
 // - streaming output & thinking (removing dead chats AND reverting)
 // - safety settings
+// - fix uri not printing
+// - double printing to debug logs
 
 // - web version
 // - refresh data
@@ -69,6 +71,7 @@ void main() async {
 // - warning popups with (dont ask again) remembering
 // - allow all files attachment
 // - token count
+// - smooth streaming
 
 /// Represents a single message in a chat session.
 class ChatMessage {

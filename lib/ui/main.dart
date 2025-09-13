@@ -60,8 +60,6 @@ class _MainUIState extends State<MainUI> {
   /// Initializes the services, including the logging service.
   Future<void> _initializeServices() async {
     await Logging.configure();
-    final logger = Logging();
-    logger.info('Services initialized');
   }
 
   /// Loads the pinned state of the side navigation bar from shared preferences.

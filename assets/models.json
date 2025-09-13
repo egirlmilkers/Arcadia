@@ -4,13 +4,15 @@
 		"subtitle": "Fast all-around help",
 		"name": "gemini-2.5-flash",
 		"url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-		"thinking": true
+		"thinking": true,
+		"src": "gemini"
 	},
 	{
 		"displayName": "2.5 Pro",
 		"subtitle": "Reasoning, math & code",
 		"name": "gemini-2.5-pro",
 		"url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent",
-		"thinking": true
+		"thinking": true,
+		"src": "gemini"
 	}
 ]

@@ -10,7 +10,6 @@ import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:toastification/toastification.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path/path.dart' as p;
 
 import '../services/logging.dart';
@@ -19,7 +18,7 @@ import 'md/code_block.dart';
 import 'md/highlight.dart';
 import '../main.dart';
 import '../services/chat_history.dart';
-import '../services/gemini.dart';
+import '../services/ai_api.dart';
 import '../services/model.dart' as model_service;
 import '../theme/manager.dart';
 import '../util.dart';
@@ -57,7 +56,7 @@ class _ChatUIState extends State<ChatUI> {
   final ChatHistoryService _chatHistoryService = ChatHistoryService();
   final Logging _logger = Logging();
   bool _isLoading = false;
-  GeminiService? _geminiService;
+  AiApi? _aiApi;
   List<PlatformFile> _attachments = [];
 
   @override
@@ -72,7 +71,7 @@ class _ChatUIState extends State<ChatUI> {
   void dispose() {
     _scrollController.dispose();
     // Cancel any ongoing Gemini service call to prevent memory leaks.
-    _geminiService?.cancel();
+    _aiApi?.cancel();
     super.dispose();
   }
 
@@ -131,15 +130,19 @@ class _ChatUIState extends State<ChatUI> {
     }
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final apiKey = prefs.getString('gemini_api_key');
+      final apiKey = await getApiKey(widget.selectedModel.apiSrc);
       if (apiKey == null || apiKey.isEmpty) {
         throw Exception("API key not set. Please set it in settings.");
       }
 
-      final titleService = GeminiService(apiKey: apiKey);
-      final contentService = GeminiService(apiKey: apiKey);
-      _geminiService = contentService;
+      final titleService = AiApi(apiKey: apiKey);
+      final contentService = AiApi(apiKey: apiKey);
+      _aiApi = contentService;
+      
+      _logger.dprint(widget.chatSession.messages.map((msg) => msg.text).toList().toString(), 'Prompt Messages');
+      _logger.dprint(widget.selectedModel.url, 'Prompt URL');
+      _logger.dprint(widget.selectedModel.apiSrc, 'API Source');
+      _logger.dprint(widget.selectedModel.thinking.toString(), 'Can Think');
 
       Map<String, dynamic> modelResponse;
       if (isNewChat) {
@@ -150,13 +153,14 @@ class _ChatUIState extends State<ChatUI> {
         final titleFuture = titleService.generateContent(
           [ChatMessage(text: prompt, isUser: true)],
           'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
-          thinking: false,
+          'gemini',
         );
 
         final contentFuture = contentService.generateContent(
           widget.chatSession.messages,
           widget.selectedModel.url,
-          thinking: widget.selectedModel.thinking,
+          widget.selectedModel.apiSrc,
+          widget.selectedModel.thinking,
         );
 
         final results = await Future.wait([titleFuture, contentFuture]);
@@ -176,12 +180,13 @@ class _ChatUIState extends State<ChatUI> {
         modelResponse = await contentService.generateContent(
           widget.chatSession.messages,
           widget.selectedModel.url,
-          thinking: widget.selectedModel.thinking,
+          widget.selectedModel.apiSrc,
+          widget.selectedModel.thinking,
         );
       }
 
       // Handle user cancellation.
-      if (modelResponse['text'] == GeminiService.cancelledResponse) {
+      if (modelResponse['text'] == AiApi.cancelledResponse) {
         revertGivenPrompt();
         _logger.info('Message sending cancelled by user.');
         return;
@@ -189,6 +194,7 @@ class _ChatUIState extends State<ChatUI> {
 
       // Handle API errors.
       if (modelResponse['error'] != null) {
+        _logger.dprint(modelResponse.toString(), 'Model Response');
         throw Exception(modelResponse['error']);
       }
 
@@ -238,7 +244,7 @@ class _ChatUIState extends State<ChatUI> {
 
   /// Stops the currently streaming message generation.
   void _stopMessage() {
-    _geminiService?.cancel();
+    _aiApi?.cancel();
     setState(() {
       _isLoading = false;
     });
@@ -275,23 +281,23 @@ class _ChatUIState extends State<ChatUI> {
     _logger.info('Regenerating response for message at index $messageIndex.');
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final apiKey = prefs.getString('gemini_api_key');
+      final apiKey = await getApiKey('gemini');
       if (apiKey == null || apiKey.isEmpty) {
         throw Exception("API key not set. Please set it in settings.");
       }
 
-      final contentService = GeminiService(apiKey: apiKey);
-      _geminiService = contentService;
+      final contentService = AiApi(apiKey: apiKey);
+      _aiApi = contentService;
 
       final modelResponse = await contentService.generateContent(
         widget.chatSession.messages,
         widget.selectedModel.url,
-        thinking: widget.selectedModel.thinking,
+        widget.selectedModel.apiSrc,
+        widget.selectedModel.thinking,
       );
 
       // Handle user cancellation.
-      if (modelResponse['text'] == GeminiService.cancelledResponse) {
+      if (modelResponse['text'] == AiApi.cancelledResponse) {
         _logger.info('Response regeneration cancelled by user.');
         return;
       }
@@ -523,9 +529,9 @@ class _ChatUIState extends State<ChatUI> {
                       // Send the message when the user presses Enter without Shift.
                       if (HardwareKeyboard.instance.isLogicalKeyPressed(LogicalKeyboardKey.enter) &&
                           !HardwareKeyboard.instance.isShiftPressed) {
-                        if (event is KeyDownEvent) {
-                          _sendMessage();
-                        }
+                        // if (event is KeyDownEvent) {
+                        //   _sendMessage();
+                        // }
                         return KeyEventResult.handled;
                       }
                       return KeyEventResult.ignored;

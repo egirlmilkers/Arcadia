@@ -4,16 +4,18 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:mime/mime.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../main.dart';
 import 'logging.dart';
 
 /// Handles the content generation in a separate isolate to avoid blocking the UI.
 ///
-/// This function is responsible for making the API call to the Gemini service,
+/// This function is responsible for making the API call to the service,
 /// handling request cancellation, and processing attachments. It communicates
 /// back to the main isolate via a `SendPort`.
 void _generateContentIsolate(Map<String, dynamic> params) async {
+  print('generateContentIsolate($params)');
   // Establishes communication channels between the main isolate and this isolate.
   final mainSendPort = params['sendPort'] as SendPort;
   final receivePort = ReceivePort();
@@ -26,13 +28,13 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
       .map((m) => ChatMessage.fromJson(m as Map<String, dynamic>))
       .toList();
   final bool canThink = params['thinking'];
+  final String src = params['src'];
 
-  // The host for the Gemini API.
+  // The host for the API.
   final host = Uri.parse(modelUrl).host;
 
   HttpClient? client = HttpClient();
   var requestCancelled = false;
-  final logger = Logging();
 
   // Listens for a 'cancel' message from the main isolate.
   receivePort.listen((message) {
@@ -41,7 +43,7 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
       client?.close(force: true);
       client = null;
       receivePort.close();
-      logger.info('Content generation cancelled by user.');
+      Logging().info('Content generation cancelled by user.');
     }
   });
 
@@ -55,7 +57,7 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
       if (!addresses.isNotEmpty) {
         // Sends an error message if DNS resolution fails.
         mainSendPort.send('Error: Could not resolve DNS for API host (IPv4).');
-        logger.error('Could not resolve DNS for API host (IPv4).');
+        Logging().error('Could not resolve DNS for API host (IPv4).');
         return;
       }
     } on SocketException catch (e) {
@@ -63,25 +65,26 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
       mainSendPort.send(
         'Error: DNS lookup failed. Code: ${e.osError?.errorCode}, Message: ${e.osError?.message}',
       );
-      logger.error('DNS lookup failed', e, StackTrace.current);
+      Logging().error('DNS lookup failed', e, StackTrace.current);
       return;
     }
 
     // Checks if the request was cancelled before proceeding.
     if (requestCancelled) {
-      mainSendPort.send(GeminiService.cancelledResponse);
+      mainSendPort.send(AiApi.cancelledResponse);
       return;
     }
 
     // Constructs the API endpoint URL.
-    final url = Uri.parse(modelUrl);
+    final url = Uri.parse('$modelUrl${src == 'vertex' ? '?key=$apiKey' : ''}');
+    Logging().dprint(url.toString(), 'Parsed URL');
 
     // Prepares the chat history for the API request.
     var history = List.of(messages);
     final firstUserIndex = history.indexWhere((m) => m.isUser);
     if (firstUserIndex == -1) {
       mainSendPort.send("Error: Cannot send a message without user input.");
-      logger.warning('Attempted to send a message without user input.');
+      Logging().warning('Attempted to send a message without user input.');
       return;
     }
     history = history.sublist(firstUserIndex);
@@ -108,7 +111,7 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
                 }
               } catch (e) {
                 // Logs an error if an attachment cannot be processed.
-                logger.error('Error processing attachment: $attachmentPath', e);
+                Logging().error('Error processing attachment: $attachmentPath', e);
               }
             }
           }
@@ -124,7 +127,7 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
       };
     }
 
-    logger.info(body.toString());
+    Logging().info(body.toString());
 
     // Configures the HttpClient to trust the Google API certificate.
     client!.badCertificateCallback =
@@ -171,28 +174,28 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
           });
         } else {
           mainSendPort.send('Error: Invalid response structure from API.');
-          logger.error(
+          Logging().error(
             'Invalid response structure: "parts" field is missing or empty.',
           );
         }
       } else {
         mainSendPort.send('Error: Invalid response structure from API.');
-        logger.error(
+        Logging().error(
           'Invalid response structure: "candidates" field is missing or empty.',
         );
       }
     } else {
       // Sends an error message if the API call was unsuccessful.
       mainSendPort.send('Error: ${response.statusCode} - $responseBody');
-      logger.error('API error: ${response.statusCode} - $responseBody');
+      Logging().error('API error: ${response.statusCode} - $responseBody');
     }
   } catch (e) {
     // Handles any other exceptions that may occur.
     if (requestCancelled) {
-      mainSendPort.send(GeminiService.cancelledResponse);
+      mainSendPort.send(AiApi.cancelledResponse);
     } else {
       mainSendPort.send('Error making API call: $e');
-      logger.error('Error in _generateContentIsolate', e, StackTrace.current);
+      Logging().error('Error in _generateContentIsolate', e, StackTrace.current);
     }
   } finally {
     // Cleans up resources.
@@ -201,13 +204,13 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
   }
 }
 
-/// A service for interacting with the Gemini API.
+/// A service for interacting with the API.
 ///
 /// This service manages content generation in a separate isolate to prevent
 /// blocking the main UI thread. It provides methods to generate content and
 
-class GeminiService {
-  /// The API key for accessing the Gemini service.
+class AiApi {
+  /// The API key for accessing the service.
   final String apiKey;
 
   /// The port for sending messages to the isolate.
@@ -219,10 +222,10 @@ class GeminiService {
   /// A constant representing a cancelled response.
   static const String cancelledResponse = 'GEMINI_RESPONSE_CANCELLED';
 
-  /// Creates a new instance of the [GeminiService].
+  /// Creates a new instance of the [AiApi].
   ///
-  /// Requires an [apiKey] for authenticating with the Gemini API.
-  GeminiService({required this.apiKey});
+  /// Requires an [apiKey] for authenticating with the API.
+  AiApi({required this.apiKey});
 
   /// Generates content based on a list of messages.
   ///
@@ -236,11 +239,12 @@ class GeminiService {
   Future<Map<String, dynamic>> generateContent(
     List<ChatMessage> messages,
     String url,
-    {bool? thinking = false}
+    String src,
+    [bool? thinking = false]
   ) async {
+    print('generateContent(messages: $messages, url: $url, src: $src, thinking: $thinking)');
     final completer = Completer<Map<String, dynamic>>();
     final receivePort = ReceivePort();
-    final logger = Logging();
 
     final messagesAsJson = messages.map((m) => m.toJson()).toList();
 
@@ -251,6 +255,7 @@ class GeminiService {
       'url': url,
       'messages': messagesAsJson,
       'thinking': thinking,
+      'src': src
     });
 
     // Listens for data from the isolate.
@@ -260,17 +265,17 @@ class GeminiService {
       } else if (data is String && data.startsWith('Error:')) {
         // Handles error messages from the isolate.
         completer.complete({'error': data});
-        logger.error('Content generation error: $data');
+        Logging().error('Content generation error: $data');
         _cleanup();
       } else if (data is String && data == cancelledResponse) {
         // Handles cancellation.
         completer.complete({'text': cancelledResponse});
-        logger.info('Content generation was cancelled.');
+        Logging().info('Content generation was cancelled.');
         _cleanup();
       } else if (data is Map) {
         // Handles successful responses.
         completer.complete(Map<String, dynamic>.from(data));
-        logger.info('Content generated successfully.');
+        Logging().info('Content generated successfully.');
         _cleanup();
       }
     });
@@ -295,5 +300,31 @@ class GeminiService {
     _isolate?.kill(priority: Isolate.immediate);
     _isolate = null;
     _sendPort = null;
+  }
+}
+
+// A minimal, private helper class just for this function to work.
+class ApiKey {
+  final String name, key;
+  ApiKey({required this.name, required this.key});
+  factory ApiKey.fromJson(Map<String, dynamic> json) =>
+      ApiKey(name: json['name'] as String, key: json['key'] as String);
+}
+
+/// Retrieves a single API key by its name from storage.
+Future<String?> getApiKey(String keyName) async {
+  final prefs = await SharedPreferences.getInstance();
+  final jsonString = prefs.getString('api_keys');
+  if (jsonString == null) return null;
+
+  try {
+    final key = (jsonDecode(jsonString) as List)
+        .cast<Map<String, dynamic>>()
+        .map(ApiKey.fromJson)
+        .firstWhere((k) => k.name.toLowerCase() == keyName.toLowerCase(), orElse: () => ApiKey(name: '', key: ''))
+        .key;
+    return key.isNotEmpty ? key : null;
+  } catch (e) {
+    return null;
   }
 }
