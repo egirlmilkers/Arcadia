@@ -46,6 +46,7 @@ void main() async {
 
 // ========== TODO ==========
 // - streaming output & thinking (removing dead chats AND reverting)
+// - boot in center of screen
 
 // - generation & safety settings will fail with other non-google models
 // - refresh data
@@ -90,7 +91,7 @@ class ChatMessage {
   final DateTime createdAt;
 
   /// The thinking process summary from the AI.
-  final String? thinkingProcess;
+  String? thinkingProcess;
 
   ChatMessage({
     required this.text,

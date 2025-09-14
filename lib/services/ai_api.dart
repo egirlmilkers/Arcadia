@@ -32,48 +32,20 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
   final String src = params['src'];
   final bool stream = params['stream'];
 
-  // The host for the API.
-  final host = Uri.parse(modelUrl).host;
-
-  HttpClient? client = HttpClient();
+  final client = http.Client();
   var requestCancelled = false;
 
   // Listens for a 'cancel' message from the main isolate.
   receivePort.listen((message) {
     if (message == 'cancel') {
       requestCancelled = true;
-      client?.close(force: true);
-      client = null;
+      client.close();
       receivePort.close();
       ArcadiaLog().info('Content generation cancelled by user.');
     }
   });
 
   try {
-    try {
-      // Performs a DNS lookup to get the IP address of the API host.
-      final addresses = await InternetAddress.lookup(host, type: InternetAddressType.IPv4);
-      if (!addresses.isNotEmpty) {
-        // Sends an error message if DNS resolution fails.
-        mainSendPort.send('Error: Could not resolve DNS for API host (IPv4).');
-        ArcadiaLog().error('Could not resolve DNS for API host (IPv4).');
-        return;
-      }
-    } on SocketException catch (e) {
-      // Handles exceptions during DNS lookup.
-      mainSendPort.send(
-        'Error: DNS lookup failed. Code: ${e.osError?.errorCode}, Message: ${e.osError?.message}',
-      );
-      ArcadiaLog().error('DNS lookup failed', e, StackTrace.current);
-      return;
-    }
-
-    // Checks if the request was cancelled before proceeding.
-    if (requestCancelled) {
-      mainSendPort.send(AiApi.cancelledResponse);
-      return;
-    }
-
     // Constructs the API endpoint URL.
     final url = Uri.parse('$modelUrl${stream ? ':streamGenerateContent' : ':generateContent'}');
 
@@ -136,13 +108,8 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
 
     ArcadiaLog().info(body.toString());
 
-    // Configures the HttpClient to trust the Google API certificate.
-    client!.badCertificateCallback = (X509Certificate cert, String connectedHost, int port) {
-      return cert.subject.contains(host);
-    };
-
     // // Sends the API request.
-    final response = await http.post(
+    final response = await client.post(
       url,
       headers: {
         if (src == 'gemini') 'X-goog-api-key': apiKey,
@@ -197,7 +164,7 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
     }
   } finally {
     // Cleans up resources.
-    client?.close();
+    client.close();
     receivePort.close();
   }
 }
