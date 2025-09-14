@@ -56,8 +56,8 @@ void main() async {
 // - streaming output & thinking (removing dead chats AND reverting)
 
 // - refresh data
-// - chat popup menu doesnt work if not pinned
 // - generate even if switching tabs
+// - price calculator
 
 // ===== Future Updates =====
 // - web version
