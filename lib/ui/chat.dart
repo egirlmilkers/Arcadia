@@ -129,64 +129,60 @@ class _ChatUIState extends State<ChatUI> {
     }
 
     try {
+      // get api keys given in settings and fail if non-existent
       final apiKey = await getApiKey(widget.selectedModel.apiSrc);
-      final titleApiKey = await getApiKey('gemini');
       if (apiKey == null || apiKey.isEmpty) {
         throw Exception("API key not set. Please set it in settings.");
       }
-      if (titleApiKey == null || titleApiKey.isEmpty) {
-        throw Exception("Title generation uses the Gemini API. Please set your Gemini API key in settings.");
-      }
 
+      // process our REST API with these api keys
       final contentService = AiApi(apiKey: apiKey);
       _aiApi = contentService;
-      final titleService = AiApi(apiKey: titleApiKey);
-      
-      ArcadiaLog().dprint(widget.chatSession.messages.map((msg) => msg.text).toList().toString(), 'Prompt Messages');
+
       ArcadiaLog().dprint(widget.selectedModel.url, 'Prompt URL');
       ArcadiaLog().dprint(widget.selectedModel.apiSrc, 'API Source');
       ArcadiaLog().dprint(widget.selectedModel.thinking.toString(), 'Can Think');
 
-      Map<String, dynamic> modelResponse;
+      // If it's a new chat, generate a title.
       if (isNewChat) {
-        // If it's a new chat, generate a title and content concurrently.
-        ArcadiaLog().info('New chat detected. Generating title and content.');
+        ArcadiaLog().info('New chat detected. Generating title.');
+
+        // we use gemini to get a title
+        final titleApiKey = await getApiKey('gemini');
+        if (titleApiKey == null || titleApiKey.isEmpty) {
+          throw Exception(
+            "Title generation uses the Gemini API. Please set your Gemini API key in settings.",
+          );
+        }
+        final titleService = AiApi(apiKey: titleApiKey);
+
         final titlePrompt =
             'Generate a short, concise header (5 words max) for an ai chat started with this user query:\n\n$originalMessage\n\n[Please do not provide anything else, just the 5 word title. This will show up in a list of multiple user chat sessions so it needs to be easily distiniguishable without the need to open the chat.]';
-        final titleFuture = titleService.generateContent(
+
+        // manual input for the title
+        final Map<String, dynamic> titleResponse = await titleService.generateContent(
           [ChatMessage(text: titlePrompt, isUser: true)],
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
+          'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest',
           'gemini',
         );
 
-        final contentFuture = contentService.generateContent(
-          widget.chatSession.messages,
-          widget.selectedModel.url,
-          widget.selectedModel.apiSrc,
-          widget.selectedModel.thinking,
-        );
-
-        final results = await Future.wait([titleFuture, contentFuture]);
-        final newTitleResponse = results[0];
-        modelResponse = results[1];
-
-        if (newTitleResponse['error'] == null) {
+        if (titleResponse['error'] == null) {
           setState(() {
-            widget.chatSession.title = newTitleResponse['text'].replaceAll('"', '').trim();
+            widget.chatSession.title = titleResponse['text'].replaceAll('"', '').trim();
           });
           ArcadiaLog().info('Generated new chat title: ${widget.chatSession.title}');
         } else {
           ArcadiaLog().warning('Failed to generate chat title.');
         }
-      } else {
-        // If it's an existing chat, just generate content.
-        modelResponse = await contentService.generateContent(
-          widget.chatSession.messages,
-          widget.selectedModel.url,
-          widget.selectedModel.apiSrc,
-          widget.selectedModel.thinking,
-        );
       }
+
+      // Generate content.
+      Map<String, dynamic> modelResponse = await contentService.generateContent(
+        widget.chatSession.messages,
+        widget.selectedModel.url,
+        widget.selectedModel.apiSrc,
+        widget.selectedModel.thinking,
+      );
 
       // Handle user cancellation.
       if (modelResponse['text'] == AiApi.cancelledResponse) {
@@ -218,6 +214,7 @@ class _ChatUIState extends State<ChatUI> {
         widget.onNewMessage?.call(widget.chatSession.title);
       }
     } catch (e, s) {
+      // give the user back their prompt if something fails
       revertGivenPrompt();
       ArcadiaLog().error('Error sending message', e, s);
 
@@ -284,7 +281,7 @@ class _ChatUIState extends State<ChatUI> {
     ArcadiaLog().info('Regenerating response for message at index $messageIndex.');
 
     try {
-      final apiKey = await getApiKey('gemini');
+      final apiKey = await getApiKey(widget.selectedModel.apiSrc);
       if (apiKey == null || apiKey.isEmpty) {
         throw Exception("API key not set. Please set it in settings.");
       }

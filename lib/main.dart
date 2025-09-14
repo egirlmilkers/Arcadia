@@ -46,16 +46,14 @@ void main() async {
 
 // ========== TODO ==========
 // - streaming output & thinking (removing dead chats AND reverting)
-// - safety settings
-// - fix uri not printing
-// - double printing to debug logs
 
-// - web version
+// - generation & safety settings will fail with other non-google models
 // - refresh data
-// - chat popup menu doesnt work if  not pinned
+// - chat popup menu doesnt work if not pinned
 // - generate even if switching tabs
 
 // ===== Future Updates =====
+// - web version
 // - gemma
 // - android version
 // - allow models like chatgpt and deepseek

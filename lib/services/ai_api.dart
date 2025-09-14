@@ -30,6 +30,7 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
       .toList();
   final bool canThink = params['thinking'];
   final String src = params['src'];
+  final bool stream = params['stream'];
 
   // The host for the API.
   final host = Uri.parse(modelUrl).host;
@@ -74,7 +75,7 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
     }
 
     // Constructs the API endpoint URL.
-    final url = Uri.parse(modelUrl);
+    final url = Uri.parse('$modelUrl${stream ? ':streamGenerateContent' : ':generateContent'}');
 
     // Prepares the chat history for the API request.
     var history = List.of(messages);
@@ -88,42 +89,50 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
 
     final Map<String, dynamic> body;
     // Constructs the request body with message content and attachments.
-      body = <String, dynamic>{
-        'contents': await Future.wait(
-          history.map((message) async {
-            final parts = <Map<String, dynamic>>[];
-            parts.add({'text': message.text});
+    body = <String, dynamic>{
+      'contents': await Future.wait(
+        history.map((message) async {
+          final parts = <Map<String, dynamic>>[];
+          parts.add({'text': message.text});
 
-            // Processes and encodes attachments as base64 strings.
-            if (message.attachments.isNotEmpty) {
-              for (final attachmentPath in message.attachments) {
-                try {
-                  final file = File(attachmentPath);
-                  final mimeType = lookupMimeType(attachmentPath);
-                  if (mimeType != null) {
-                    final bytes = await file.readAsBytes();
-                    final base64String = base64Encode(bytes);
-                    parts.add({
-                      'inlineData': {'mimeType': mimeType, 'data': base64String},
-                    });
-                  }
-                } catch (e) {
-                  // Logs an error if an attachment cannot be processed.
-                  ArcadiaLog().error('Error processing attachment: $attachmentPath', e);
+          // Processes and encodes attachments as base64 strings.
+          if (message.attachments.isNotEmpty) {
+            for (final attachmentPath in message.attachments) {
+              try {
+                final file = File(attachmentPath);
+                final mimeType = lookupMimeType(attachmentPath);
+                if (mimeType != null) {
+                  final bytes = await file.readAsBytes();
+                  final base64String = base64Encode(bytes);
+                  parts.add({
+                    'inlineData': {'mimeType': mimeType, 'data': base64String},
+                  });
                 }
+              } catch (e) {
+                // Logs an error if an attachment cannot be processed.
+                ArcadiaLog().error('Error processing attachment: $attachmentPath', e);
               }
             }
+          }
 
-            return {'role': message.isUser ? 'user' : 'model', 'parts': parts};
-          }),
-        ),
-      };
+          return {'role': message.isUser ? 'user' : 'model', 'parts': parts};
+        }),
+      ),
+      // prepare safety settings
+      'safetySettings': [
+        {'category': 'HARM_CATEGORY_HARASSMENT', 'threshold': 'BLOCK_NONE'},
+        {'category': 'HARM_CATEGORY_HATE_SPEECH', 'threshold': 'BLOCK_NONE'},
+        {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold': 'BLOCK_NONE'},
+        {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold': 'BLOCK_NONE'},
+        {'category': 'HARM_CATEGORY_CIVIC_INTEGRITY', 'threshold': 'BLOCK_NONE'},
+      ],
 
-      if (canThink) {
-        body['generationConfig'] = {
+      // thinking config
+      if (canThink)
+        'generationConfig': {
           'thinkingConfig': {'thinkingBudget': -1, 'includeThoughts': true},
-        };
-      }
+        },
+    };
 
     ArcadiaLog().info(body.toString());
 
@@ -230,6 +239,7 @@ class AiApi {
     String url,
     String src, [
     bool? thinking = false,
+    bool? stream = false,
   ]) async {
     final completer = Completer<Map<String, dynamic>>();
     final receivePort = ReceivePort();
@@ -245,6 +255,7 @@ class AiApi {
       'messages': messagesAsJson,
       'thinking': thinking,
       'src': src,
+      'stream': stream,
     });
 
     // Listens for data from the isolate.
