@@ -21,7 +21,7 @@ void main() async {
   // GoogleFonts.config.allowRuntimeFetching = false;
   WidgetsFlutterBinding.ensureInitialized();
   await windowManager.ensureInitialized();
-  await Logging().configure();
+  await ArcadiaLog().configure();
 
   final packageInfo = await PackageInfo.fromPlatform();
   appVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
@@ -72,6 +72,7 @@ void main() async {
 // - allow all files attachment
 // - token count
 // - smooth streaming
+// - message subtitle of which ai generated it
 
 /// Represents a single message in a chat session.
 class ChatMessage {

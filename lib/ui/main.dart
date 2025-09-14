@@ -68,7 +68,7 @@ class _MainUIState extends State<MainUI> {
   void _savePinState(bool isPinned) async {
     final prefs = await SharedPreferences.getInstance();
     prefs.setBool('isPinned', isPinned);
-    Logging().info('Saved pin state: $isPinned');
+    ArcadiaLog().info('Saved pin state: $isPinned');
   }
 
   /// Loads the chat history from the chat history service.
@@ -85,7 +85,7 @@ class _MainUIState extends State<MainUI> {
         version: appVersion!,
       );
     });
-    Logging().info('Started new chat');
+    ArcadiaLog().info('Started new chat');
   }
 
   /// Deletes a chat session.
@@ -96,7 +96,7 @@ class _MainUIState extends State<MainUI> {
     await _chatHistoryService.deleteChat(chat);
     await _loadChatHistory();
     setState(() {});
-    Logging().info('Deleted chat with ID: ${chat.id}');
+    ArcadiaLog().info('Deleted chat with ID: ${chat.id}');
   }
 
   /// Archives a chat session.
@@ -107,7 +107,7 @@ class _MainUIState extends State<MainUI> {
     await _chatHistoryService.archiveChat(chat);
     await _loadChatHistory();
     setState(() {});
-    Logging().info('Archived chat with ID: ${chat.id}');
+    ArcadiaLog().info('Archived chat with ID: ${chat.id}');
   }
 
   /// Renames a chat session.
@@ -121,16 +121,16 @@ class _MainUIState extends State<MainUI> {
         _activeChat = _chatHistory.firstWhere((c) => c.id == activeChatId);
       } catch (e) {
         _activeChat = null;
-        Logging().warning('Failed to find renamed chat in history', e);
+        ArcadiaLog().warning('Failed to find renamed chat in history', e);
       }
     }
     setState(() {});
-    Logging().info('Renamed chat with ID: ${chat.id} to "$newTitle"');
+    ArcadiaLog().info('Renamed chat with ID: ${chat.id} to "$newTitle"');
   }
 
   /// Exports a chat session to a JSON file.
   Future<File?> _exportChat(ArcadiaChat chat) async {
-    final logger = Logging();
+    final logger = ArcadiaLog();
     if (await Permission.storage.status.isGranted) {
       final downloadsDir = await getDownloadsDirectory();
 
@@ -166,7 +166,7 @@ class _MainUIState extends State<MainUI> {
     setState(() {
       _activeChat = chat;
     });
-    Logging().info('Selected chat with ID: ${chat.id}');
+    ArcadiaLog().info('Selected chat with ID: ${chat.id}');
   }
 
   /// Resets the view to the home screen by clearing the active chat.
@@ -174,7 +174,7 @@ class _MainUIState extends State<MainUI> {
     setState(() {
       _activeChat = null;
     });
-    Logging().info('Reset to home screen');
+    ArcadiaLog().info('Reset to home screen');
   }
 
   /// Toggles the pinned state of the side navigation bar.

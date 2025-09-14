@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:arcadia/services/api/vertex.dart';
+import 'package:http/http.dart' as http;
 import 'package:mime/mime.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -15,8 +17,6 @@ import 'logging.dart';
 /// handling request cancellation, and processing attachments. It communicates
 /// back to the main isolate via a `SendPort`.
 void _generateContentIsolate(Map<String, dynamic> params) async {
-  final Logging logger = params['logger'];
-  logger.dprint(params.toString(), 'generateContentIsolate');
   // Establishes communication channels between the main isolate and this isolate.
   final mainSendPort = params['sendPort'] as SendPort;
   final receivePort = ReceivePort();
@@ -44,21 +44,18 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
       client?.close(force: true);
       client = null;
       receivePort.close();
-      Logging().info('Content generation cancelled by user.');
+      ArcadiaLog().info('Content generation cancelled by user.');
     }
   });
 
   try {
     try {
       // Performs a DNS lookup to get the IP address of the API host.
-      final addresses = await InternetAddress.lookup(
-        host,
-        type: InternetAddressType.IPv4,
-      );
+      final addresses = await InternetAddress.lookup(host, type: InternetAddressType.IPv4);
       if (!addresses.isNotEmpty) {
         // Sends an error message if DNS resolution fails.
         mainSendPort.send('Error: Could not resolve DNS for API host (IPv4).');
-        Logging().error('Could not resolve DNS for API host (IPv4).');
+        ArcadiaLog().error('Could not resolve DNS for API host (IPv4).');
         return;
       }
     } on SocketException catch (e) {
@@ -66,7 +63,7 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
       mainSendPort.send(
         'Error: DNS lookup failed. Code: ${e.osError?.errorCode}, Message: ${e.osError?.message}',
       );
-      Logging().error('DNS lookup failed', e, StackTrace.current);
+      ArcadiaLog().error('DNS lookup failed', e, StackTrace.current);
       return;
     }
 
@@ -77,84 +74,82 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
     }
 
     // Constructs the API endpoint URL.
-    final url = Uri.parse('$modelUrl${src == 'vertex' ? '?key=$apiKey' : ''}');
-    print('Parsed URL: $url'); // Use a raw print()
+    final url = Uri.parse(modelUrl);
 
     // Prepares the chat history for the API request.
     var history = List.of(messages);
     final firstUserIndex = history.indexWhere((m) => m.isUser);
     if (firstUserIndex == -1) {
       mainSendPort.send("Error: Cannot send a message without user input.");
-      Logging().warning('Attempted to send a message without user input.');
+      ArcadiaLog().warning('Attempted to send a message without user input.');
       return;
     }
     history = history.sublist(firstUserIndex);
 
+    final Map<String, dynamic> body;
     // Constructs the request body with message content and attachments.
-    final body = <String, dynamic>{
-      'contents': await Future.wait(
-        history.map((message) async {
-          final parts = <Map<String, dynamic>>[];
-          parts.add({'text': message.text});
+      body = <String, dynamic>{
+        'contents': await Future.wait(
+          history.map((message) async {
+            final parts = <Map<String, dynamic>>[];
+            parts.add({'text': message.text});
 
-          // Processes and encodes attachments as base64 strings.
-          if (message.attachments.isNotEmpty) {
-            for (final attachmentPath in message.attachments) {
-              try {
-                final file = File(attachmentPath);
-                final mimeType = lookupMimeType(attachmentPath);
-                if (mimeType != null) {
-                  final bytes = await file.readAsBytes();
-                  final base64String = base64Encode(bytes);
-                  parts.add({
-                    'inlineData': {'mimeType': mimeType, 'data': base64String},
-                  });
+            // Processes and encodes attachments as base64 strings.
+            if (message.attachments.isNotEmpty) {
+              for (final attachmentPath in message.attachments) {
+                try {
+                  final file = File(attachmentPath);
+                  final mimeType = lookupMimeType(attachmentPath);
+                  if (mimeType != null) {
+                    final bytes = await file.readAsBytes();
+                    final base64String = base64Encode(bytes);
+                    parts.add({
+                      'inlineData': {'mimeType': mimeType, 'data': base64String},
+                    });
+                  }
+                } catch (e) {
+                  // Logs an error if an attachment cannot be processed.
+                  ArcadiaLog().error('Error processing attachment: $attachmentPath', e);
                 }
-              } catch (e) {
-                // Logs an error if an attachment cannot be processed.
-                Logging().error('Error processing attachment: $attachmentPath', e);
               }
             }
-          }
 
-          return {'role': message.isUser ? 'user' : 'model', 'parts': parts};
-        }),
-      ),
-    };
-
-    if (canThink) {
-      body['generationConfig'] = {
-        'thinkingConfig': {'thinkingBudget': -1, 'includeThoughts': true},
+            return {'role': message.isUser ? 'user' : 'model', 'parts': parts};
+          }),
+        ),
       };
-    }
 
-    Logging().info(body.toString());
+      if (canThink) {
+        body['generationConfig'] = {
+          'thinkingConfig': {'thinkingBudget': -1, 'includeThoughts': true},
+        };
+      }
+
+    ArcadiaLog().info(body.toString());
 
     // Configures the HttpClient to trust the Google API certificate.
-    client!.badCertificateCallback =
-        (X509Certificate cert, String connectedHost, int port) {
-          return cert.subject.contains(host);
-        };
+    client!.badCertificateCallback = (X509Certificate cert, String connectedHost, int port) {
+      return cert.subject.contains(host);
+    };
 
-    // Sends the API request.
-    final request = await client!.postUrl(url);
-    request.headers.set('Host', host);
-    request.headers.set('x-goog-api-key', apiKey);
-    request.headers.set('Content-Type', 'application/json; charset=UTF-8');
-    request.write(jsonEncode(body));
-
-    final response = await request.close();
-    final responseBody = await response.transform(utf8.decoder).join();
+    // // Sends the API request.
+    final response = await http.post(
+      url,
+      headers: {
+        if (src == 'gemini') 'X-goog-api-key': apiKey,
+        if (src != 'gemini') 'Authorization': 'Bearer $apiKey',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(body),
+    );
 
     // Processes the API response.
     if (response.statusCode == 200) {
-      final jsonResponse = jsonDecode(responseBody);
+      final jsonResponse = jsonDecode(response.body);
       final candidates = jsonResponse['candidates'];
       if (candidates != null && candidates.isNotEmpty) {
         final content = candidates[0]['content'];
-        if (content != null &&
-            content['parts'] != null &&
-            content['parts'].isNotEmpty) {
+        if (content != null && content['parts'] != null && content['parts'].isNotEmpty) {
           final List<dynamic> parts = content['parts'];
           String thoughtSummary = '';
           String finalAnswer = '';
@@ -169,26 +164,19 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
           }
 
           // Sends the successful response back to the main isolate.
-          mainSendPort.send({
-            'text': finalAnswer,
-            'thinkingProcess': thoughtSummary,
-          });
+          mainSendPort.send({'text': finalAnswer, 'thinkingProcess': thoughtSummary});
         } else {
           mainSendPort.send('Error: Invalid response structure from API.');
-          Logging().error(
-            'Invalid response structure: "parts" field is missing or empty.',
-          );
+          ArcadiaLog().error('Invalid response structure: "parts" field is missing or empty.');
         }
       } else {
         mainSendPort.send('Error: Invalid response structure from API.');
-        Logging().error(
-          'Invalid response structure: "candidates" field is missing or empty.',
-        );
+        ArcadiaLog().error('Invalid response structure: "candidates" field is missing or empty.');
       }
     } else {
       // Sends an error message if the API call was unsuccessful.
-      mainSendPort.send('Error: ${response.statusCode} - $responseBody');
-      Logging().error('API error: ${response.statusCode} - $responseBody');
+      mainSendPort.send('Error: ${response.statusCode} - \n${response.body}');
+      ArcadiaLog().error('API error: ${response.statusCode} - \n${response.body}');
     }
   } catch (e) {
     // Handles any other exceptions that may occur.
@@ -196,7 +184,7 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
       mainSendPort.send(AiApi.cancelledResponse);
     } else {
       mainSendPort.send('Error making API call: $e');
-      Logging().error('Error in _generateContentIsolate', e, StackTrace.current);
+      ArcadiaLog().error('Error in _generateContentIsolate', e, StackTrace.current);
     }
   } finally {
     // Cleans up resources.
@@ -240,10 +228,9 @@ class AiApi {
   Future<Map<String, dynamic>> generateContent(
     List<ChatMessage> messages,
     String url,
-    String src,
-    [bool? thinking = false]
-  ) async {
-    Logging().dprint('messages: $messages, url: $url, src: $src, thinking: $thinking', 'generateContent');
+    String src, [
+    bool? thinking = false,
+  ]) async {
     final completer = Completer<Map<String, dynamic>>();
     final receivePort = ReceivePort();
 
@@ -251,13 +238,13 @@ class AiApi {
 
     // Spawns the isolate for content generation.
     _isolate = await Isolate.spawn(_generateContentIsolate, {
-      'logger': Logging(),
+      'logger': ArcadiaLog(),
       'sendPort': receivePort.sendPort,
       'apiKey': apiKey,
       'url': url,
       'messages': messagesAsJson,
       'thinking': thinking,
-      'src': src
+      'src': src,
     });
 
     // Listens for data from the isolate.
@@ -267,17 +254,17 @@ class AiApi {
       } else if (data is String && data.startsWith('Error:')) {
         // Handles error messages from the isolate.
         completer.complete({'error': data});
-        Logging().error('Content generation error: $data');
+        ArcadiaLog().error('Content generation error: $data');
         _cleanup();
       } else if (data is String && data == cancelledResponse) {
         // Handles cancellation.
         completer.complete({'text': cancelledResponse});
-        Logging().info('Content generation was cancelled.');
+        ArcadiaLog().info('Content generation was cancelled.');
         _cleanup();
       } else if (data is Map) {
         // Handles successful responses.
         completer.complete(Map<String, dynamic>.from(data));
-        Logging().info('Content generated successfully.');
+        ArcadiaLog().info('Content generated successfully.');
         _cleanup();
       }
     });
@@ -293,7 +280,7 @@ class AiApi {
     if (_isolate != null) {
       _sendPort?.send('cancel');
       _cleanup();
-      Logging().info('Cancellation request sent to isolate.');
+      ArcadiaLog().info('Cancellation request sent to isolate.');
     }
   }
 
@@ -320,11 +307,24 @@ Future<String?> getApiKey(String keyName) async {
   if (jsonString == null) return null;
 
   try {
-    final key = (jsonDecode(jsonString) as List)
+    // get key from api list in settings
+    String key = (jsonDecode(jsonString) as List)
         .cast<Map<String, dynamic>>()
         .map(ApiKey.fromJson)
-        .firstWhere((k) => k.name.toLowerCase() == keyName.toLowerCase(), orElse: () => ApiKey(name: '', key: ''))
+        .firstWhere(
+          (k) => k.name.toLowerCase() == keyName.toLowerCase(),
+          orElse: () => ApiKey(name: '', key: ''),
+        )
         .key;
+
+    // process api key with vertex's complicated ass system
+    if (keyName == 'vertex') {
+      key = (await VertexAPI.getVertexAIAuth(key))['authHeader'];
+      if (key.startsWith('Bearer ')) {
+        key = key.split(' ')[1];
+      }
+    }
+
     return key.isNotEmpty ? key : null;
   } catch (e) {
     return null;

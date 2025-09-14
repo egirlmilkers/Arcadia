@@ -54,7 +54,6 @@ class _ChatUIState extends State<ChatUI> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final ChatHistoryService _chatHistoryService = ChatHistoryService();
-  final Logging _logger = Logging();
   bool _isLoading = false;
   AiApi? _aiApi;
   List<PlatformFile> _attachments = [];
@@ -104,7 +103,7 @@ class _ChatUIState extends State<ChatUI> {
           attachmentPaths.add(newPath);
         }
       }
-      _logger.info('Copied ${attachmentPaths.length} attachments to permanent storage.');
+      ArcadiaLog().info('Copied ${attachmentPaths.length} attachments to permanent storage.');
     }
 
     // Optimistically update the UI with the user's message.
@@ -126,32 +125,36 @@ class _ChatUIState extends State<ChatUI> {
         _textController.text = originalMessage;
         _attachments = originalAttachments;
       });
-      _logger.warning('Reverted given prompt.');
+      ArcadiaLog().warning('Reverted given prompt.');
     }
 
     try {
       final apiKey = await getApiKey(widget.selectedModel.apiSrc);
+      final titleApiKey = await getApiKey('gemini');
       if (apiKey == null || apiKey.isEmpty) {
         throw Exception("API key not set. Please set it in settings.");
       }
+      if (titleApiKey == null || titleApiKey.isEmpty) {
+        throw Exception("Title generation uses the Gemini API. Please set your Gemini API key in settings.");
+      }
 
-      final titleService = AiApi(apiKey: apiKey);
       final contentService = AiApi(apiKey: apiKey);
       _aiApi = contentService;
+      final titleService = AiApi(apiKey: titleApiKey);
       
-      _logger.dprint(widget.chatSession.messages.map((msg) => msg.text).toList().toString(), 'Prompt Messages');
-      _logger.dprint(widget.selectedModel.url, 'Prompt URL');
-      _logger.dprint(widget.selectedModel.apiSrc, 'API Source');
-      _logger.dprint(widget.selectedModel.thinking.toString(), 'Can Think');
+      ArcadiaLog().dprint(widget.chatSession.messages.map((msg) => msg.text).toList().toString(), 'Prompt Messages');
+      ArcadiaLog().dprint(widget.selectedModel.url, 'Prompt URL');
+      ArcadiaLog().dprint(widget.selectedModel.apiSrc, 'API Source');
+      ArcadiaLog().dprint(widget.selectedModel.thinking.toString(), 'Can Think');
 
       Map<String, dynamic> modelResponse;
       if (isNewChat) {
         // If it's a new chat, generate a title and content concurrently.
-        _logger.info('New chat detected. Generating title and content.');
-        final prompt =
+        ArcadiaLog().info('New chat detected. Generating title and content.');
+        final titlePrompt =
             'Generate a short, concise header (5 words max) for an ai chat started with this user query:\n\n$originalMessage\n\n[Please do not provide anything else, just the 5 word title. This will show up in a list of multiple user chat sessions so it needs to be easily distiniguishable without the need to open the chat.]';
         final titleFuture = titleService.generateContent(
-          [ChatMessage(text: prompt, isUser: true)],
+          [ChatMessage(text: titlePrompt, isUser: true)],
           'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
           'gemini',
         );
@@ -171,9 +174,9 @@ class _ChatUIState extends State<ChatUI> {
           setState(() {
             widget.chatSession.title = newTitleResponse['text'].replaceAll('"', '').trim();
           });
-          _logger.info('Generated new chat title: ${widget.chatSession.title}');
+          ArcadiaLog().info('Generated new chat title: ${widget.chatSession.title}');
         } else {
-          _logger.warning('Failed to generate chat title.');
+          ArcadiaLog().warning('Failed to generate chat title.');
         }
       } else {
         // If it's an existing chat, just generate content.
@@ -188,13 +191,13 @@ class _ChatUIState extends State<ChatUI> {
       // Handle user cancellation.
       if (modelResponse['text'] == AiApi.cancelledResponse) {
         revertGivenPrompt();
-        _logger.info('Message sending cancelled by user.');
+        ArcadiaLog().info('Message sending cancelled by user.');
         return;
       }
 
       // Handle API errors.
       if (modelResponse['error'] != null) {
-        _logger.dprint(modelResponse.toString(), 'Model Response');
+        ArcadiaLog().dprint(modelResponse.toString(), 'Model Response');
         throw Exception(modelResponse['error']);
       }
 
@@ -216,7 +219,7 @@ class _ChatUIState extends State<ChatUI> {
       }
     } catch (e, s) {
       revertGivenPrompt();
-      _logger.error('Error sending message', e, s);
+      ArcadiaLog().error('Error sending message', e, s);
 
       // Show an error toast to the user.
       toastification.show(
@@ -248,7 +251,7 @@ class _ChatUIState extends State<ChatUI> {
     setState(() {
       _isLoading = false;
     });
-    _logger.info('Stopped message generation.');
+    ArcadiaLog().info('Stopped message generation.');
   }
 
   /// Regenerates the response for a given message.
@@ -278,7 +281,7 @@ class _ChatUIState extends State<ChatUI> {
       widget.chatSession.messages.removeRange(messageIndex, widget.chatSession.messages.length);
     });
     _scrollToBottom();
-    _logger.info('Regenerating response for message at index $messageIndex.');
+    ArcadiaLog().info('Regenerating response for message at index $messageIndex.');
 
     try {
       final apiKey = await getApiKey('gemini');
@@ -298,7 +301,7 @@ class _ChatUIState extends State<ChatUI> {
 
       // Handle user cancellation.
       if (modelResponse['text'] == AiApi.cancelledResponse) {
-        _logger.info('Response regeneration cancelled by user.');
+        ArcadiaLog().info('Response regeneration cancelled by user.');
         return;
       }
 
@@ -321,7 +324,7 @@ class _ChatUIState extends State<ChatUI> {
 
       await _chatHistoryService.saveChat(widget.chatSession);
     } catch (e, s) {
-      _logger.error('Error regenerating response', e, s);
+      ArcadiaLog().error('Error regenerating response', e, s);
       // Show an error toast to the user.
       toastification.show(
         type: ToastificationType.error,

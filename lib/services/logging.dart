@@ -10,18 +10,18 @@ import '../util.dart';
 /// This service sets up a logger that writes messages to a file, with each
 /// log file being named with a timestamp to prevent overwrites. It follows the
 /// singleton pattern to ensure a single logging instance throughout the app.
-class Logging {
+class ArcadiaLog {
   /// The single, static instance of the LoggingService.
-  static final Logging _instance = Logging._internal();
+  static final ArcadiaLog _instance = ArcadiaLog._internal();
 
   /// The logger instance.
   final Logger _logger = Logger('ArcadiaLogger');
 
   /// Private constructor for the singleton pattern.
-  Logging._internal();
+  ArcadiaLog._internal();
 
   /// Factory constructor to return the singleton instance.
-  factory Logging() {
+  factory ArcadiaLog() {
     return _instance;
   }
 
@@ -91,6 +91,6 @@ class Logging {
   ///
   /// Use this as an alternative to "print".
   void dprint(String data, String? name) {
-    info('$name: \n$data\n');
+    info('$name: $data');
   }
 }

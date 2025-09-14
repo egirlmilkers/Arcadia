@@ -135,7 +135,7 @@ Future<Directory> getArcadiaDocuments([String? subDir]) async {
   final dir = Directory(p.join(docs.path, 'Arcadia', subDir));
   if (!await dir.exists()) {
     await dir.create(recursive: true);
-    Logging().info('Created${subDir != null ? ' $subDir' : ''} directory at ${dir.path}');
+    ArcadiaLog().info('Created${subDir != null ? ' $subDir' : ''} directory at ${dir.path}');
   }
   return dir;
 }

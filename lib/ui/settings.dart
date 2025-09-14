@@ -59,7 +59,7 @@ class _SettingsPageState extends State<SettingsPage> {
         final List<dynamic> decoded = jsonDecode(keysJson);
         loadedKeys = decoded.map((e) => ApiKey.fromJson(e)).toList();
       } catch (e, s) {
-        Logging().error('Failed to decode API keys', e, s);
+        ArcadiaLog().error('Failed to decode API keys', e, s);
       }
     }
 
@@ -122,7 +122,7 @@ class _SettingsPageState extends State<SettingsPage> {
         return 'Linux (${linuxInfo.prettyName})';
       }
     } catch (e, s) {
-      Logging().error('Failed to get platform info', e, s);
+      ArcadiaLog().error('Failed to get platform info', e, s);
       return 'Platform Unknown';
     }
     return 'Unsupported Platform';
@@ -197,27 +197,38 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextFormField(
-                  controller: nameController,
-                  autofocus: true,
-                  decoration: const InputDecoration(labelText: 'Name'),
-                  enabled: existingApiKey?.name != 'Gemini',
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) return 'Name cannot be empty';
-                    if (!isEditing &&
-                        _apiKeys.any((k) => k.name.toLowerCase() == value.trim().toLowerCase())) {
-                      return 'This name already exists';
-                    }
-                    return null;
-                  },
+                // Name Field
+                SizedBox(
+                  width: 350,
+                  child: TextFormField(
+                    controller: nameController,
+                    autofocus: true,
+                    decoration: const InputDecoration(labelText: 'Name'),
+                    enabled: existingApiKey?.name != 'Gemini',
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) return 'Name cannot be empty';
+                      if (!isEditing &&
+                          _apiKeys.any((k) => k.name.toLowerCase() == value.trim().toLowerCase())) {
+                        return 'This name already exists';
+                      }
+                      return null;
+                    },
+                  ),
                 ),
+
+                // Spacer
                 const SizedBox(height: 8),
-                TextFormField(
-                  controller: keyController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Key',
-                    hintText: 'Enter your API key',
+
+                // Key Field
+                SizedBox(
+                  width: 350,
+                  child: TextFormField(
+                    controller: keyController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Key',
+                      hintText: 'Enter your API key',
+                    ),
                   ),
                 ),
               ],
@@ -259,7 +270,7 @@ class _SettingsPageState extends State<SettingsPage> {
             return AlertDialog(
               title: const Text('API Keys'),
               content: SizedBox(
-                width: double.maxFinite,
+                width: 500,
                 child: ListView.builder(
                   shrinkWrap: true,
                   itemCount: _apiKeys.length,
@@ -269,11 +280,21 @@ class _SettingsPageState extends State<SettingsPage> {
 
                     return ListTile(
                       title: Text(apiKey.name),
-                      subtitle: Text(
-                        apiKey.key.isNotEmpty && apiKey.key.length > 4
-                            ? '••••••••${apiKey.key.substring(apiKey.key.length - 4)}'
-                            : 'Not set',
-                      ),
+                      subtitle: apiKey.key.isNotEmpty && apiKey.key.length > 4
+                          ? Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    '•' * (apiKey.key.length - 4),
+                                    overflow: TextOverflow.fade,
+                                    softWrap: false,
+                                  ),
+                                ),
+                                Text(apiKey.key.substring(apiKey.key.length - 4)),
+                              ],
+                            )
+                          : Text('Not set'),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [

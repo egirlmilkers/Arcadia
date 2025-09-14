@@ -20,7 +20,7 @@ class ChatHistoryService {
     final chatsDir = await getArcadiaDocuments('chats');
     if (!await chatsDir.exists()) {
       await chatsDir.create(recursive: true);
-      Logging().info('Created chats directory at ${chatsDir.path}');
+      ArcadiaLog().info('Created chats directory at ${chatsDir.path}');
     }
     return chatsDir;
   }
@@ -42,15 +42,15 @@ class ChatHistoryService {
           final json = jsonDecode(content);
           chats.add(ArcadiaChat.fromJson(json));
         } catch (e, s) {
-          Logging().error('Error loading chat file: ${file.path}', e, s);
+          ArcadiaLog().error('Error loading chat file: ${file.path}', e, s);
         }
       }
       // Sort chats by last modified date in descending order.
       chats.sort((a, b) => b.lastModified.compareTo(a.lastModified));
-      Logging().info('Loaded ${chats.length} chats.');
+      ArcadiaLog().info('Loaded ${chats.length} chats.');
       return chats;
     } catch (e, s) {
-      Logging().error('Error loading chats', e, s);
+      ArcadiaLog().error('Error loading chats', e, s);
       return [];
     }
   }
@@ -64,9 +64,9 @@ class ChatHistoryService {
       final chatsDir = await _getChatsDirectory();
       final file = File(p.join(chatsDir.path, '${chat.id}.json'));
       await file.writeAsString(jsonEncode(chat.toJson()));
-      Logging().info('Saved chat with ID: ${chat.id}');
+      ArcadiaLog().info('Saved chat with ID: ${chat.id}');
     } catch (e, s) {
-      Logging().error('Error saving chat with ID: ${chat.id}', e, s);
+      ArcadiaLog().error('Error saving chat with ID: ${chat.id}', e, s);
     }
   }
 
@@ -79,10 +79,10 @@ class ChatHistoryService {
       final file = File(p.join(chatsDir.path, '${chat.id}.json'));
       if (await file.exists()) {
         await file.delete();
-        Logging().info('Deleted chat with ID: ${chat.id}');
+        ArcadiaLog().info('Deleted chat with ID: ${chat.id}');
       }
     } catch (e, s) {
-      Logging().error('Error deleting chat with ID: ${chat.id}', e, s);
+      ArcadiaLog().error('Error deleting chat with ID: ${chat.id}', e, s);
     }
   }
 
@@ -92,7 +92,7 @@ class ChatHistoryService {
   Future<void> renameChat(ArcadiaChat chat, String newTitle) async {
     chat.title = newTitle;
     await saveChat(chat);
-    Logging().info('Renamed chat with ID: ${chat.id} to "$newTitle"');
+    ArcadiaLog().info('Renamed chat with ID: ${chat.id} to "$newTitle"');
   }
 
   /// Archives a chat session.
@@ -104,16 +104,16 @@ class ChatHistoryService {
       final archiveDir = Directory(p.join(chatsDir.path, 'archived'));
       if (!await archiveDir.exists()) {
         await archiveDir.create(recursive: true);
-        Logging().info('Created archive directory at ${archiveDir.path}');
+        ArcadiaLog().info('Created archive directory at ${archiveDir.path}');
       }
 
       final file = File(p.join(chatsDir.path, '${chat.id}.json'));
       if (await file.exists()) {
         await file.rename(p.join(archiveDir.path, '${chat.id}.json'));
-        Logging().info('Archived chat with ID: ${chat.id}');
+        ArcadiaLog().info('Archived chat with ID: ${chat.id}');
       }
     } catch (e, s) {
-      Logging().error('Error archiving chat with ID: ${chat.id}', e, s);
+      ArcadiaLog().error('Error archiving chat with ID: ${chat.id}', e, s);
     }
   }
 
