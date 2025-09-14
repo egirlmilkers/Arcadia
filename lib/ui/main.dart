@@ -48,6 +48,9 @@ class _MainUIState extends State<MainUI> {
   /// Whether the mouse is hovering over the side navigation bar.
   bool _isHovering = false;
 
+  /// Whether a popup menu on the side navigation bar is currently open.
+  bool _isPopupMenuOpen = false;
+
   @override
   void initState() {
     super.initState();
@@ -79,11 +82,7 @@ class _MainUIState extends State<MainUI> {
   /// Starts a new chat session.
   void _startNewChat() {
     setState(() {
-      _activeChat = ArcadiaChat(
-        title: 'New Chat',
-        messages: [],
-        version: appVersion!,
-      );
+      _activeChat = ArcadiaChat(title: 'New Chat', messages: [], version: appVersion!);
     });
     ArcadiaLog().info('Started new chat');
   }
@@ -135,10 +134,7 @@ class _MainUIState extends State<MainUI> {
       final downloadsDir = await getDownloadsDirectory();
 
       final chatMessages = chat.messages.map((message) {
-        return {
-          "role": message.isUser ? "user" : "model",
-          "content": message.text,
-        };
+        return {"role": message.isUser ? "user" : "model", "content": message.text};
       }).toList();
 
       final json = {"messages": chatMessages};
@@ -195,6 +191,27 @@ class _MainUIState extends State<MainUI> {
     }
   }
 
+  /// Sets a flag to keep the sidebar expanded when a popup menu is open.
+  /// This prevents the sidebar from collapsing when the user moves their
+  /// mouse from a chat item to its popup menu.
+  void _onPopupMenuOpened() {
+    if (!_isPinned) {
+      setState(() {
+        _isPopupMenuOpen = true;
+      });
+    }
+  }
+
+  /// Resets the flag when the popup menu is closed, allowing the sidebar
+  /// to collapse normally on mouse exit.
+  void _onPopupMenuClosed() {
+    if (!_isPinned) {
+      setState(() {
+        _isPopupMenuOpen = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Get the theme and model managers from the provider.
@@ -212,7 +229,7 @@ class _MainUIState extends State<MainUI> {
         themeManager.currentTheme?.gradientColors ??
         [theme.colorScheme.primary, theme.colorScheme.tertiary];
     // Determine whether the side navigation should be expanded.
-    final bool isEffectivelyExpanded = _isPinned || _isHovering;
+    final bool isEffectivelyExpanded = _isPinned || _isHovering || _isPopupMenuOpen;
 
     return Scaffold(
       // Use a Stack to overlay the side navigation on top of the main content.
@@ -273,42 +290,31 @@ class _MainUIState extends State<MainUI> {
                         child: Builder(
                           builder: (BuildContext context) {
                             return Material(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.surfaceContainer,
+                              color: Theme.of(context).colorScheme.surfaceContainer,
                               borderRadius: BorderRadius.circular(24),
                               clipBehavior: Clip.antiAlias,
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(24),
                                 onTap: () {
-                                  final RenderBox button =
-                                      context.findRenderObject() as RenderBox;
+                                  final RenderBox button = context.findRenderObject() as RenderBox;
                                   final RenderBox overlay =
-                                      Overlay.of(
-                                            context,
-                                          ).context.findRenderObject()
-                                          as RenderBox;
+                                      Overlay.of(context).context.findRenderObject() as RenderBox;
 
                                   // Calculate the position of the dropdown menu.
                                   final Rect buttonRect = Rect.fromPoints(
-                                    button.localToGlobal(
-                                      Offset.zero,
-                                      ancestor: overlay,
-                                    ),
+                                    button.localToGlobal(Offset.zero, ancestor: overlay),
                                     button.localToGlobal(
                                       button.size.bottomRight(Offset.zero),
                                       ancestor: overlay,
                                     ),
                                   );
 
-                                  final Rect shiftedButtonRect = buttonRect
-                                      .translate(-110.0, 0.0);
+                                  final Rect shiftedButtonRect = buttonRect.translate(-110.0, 0.0);
 
-                                  final RelativeRect position =
-                                      RelativeRect.fromRect(
-                                        shiftedButtonRect,
-                                        Offset.zero & overlay.size,
-                                      );
+                                  final RelativeRect position = RelativeRect.fromRect(
+                                    shiftedButtonRect,
+                                    Offset.zero & overlay.size,
+                                  );
 
                                   // Show the dropdown menu.
                                   showMenu<Model>(
@@ -319,25 +325,19 @@ class _MainUIState extends State<MainUI> {
                                       borderRadius: BorderRadius.circular(18),
                                     ),
                                     clipBehavior: Clip.antiAlias,
-                                    items: modelManager.models.map((
-                                      Model model,
-                                    ) {
+                                    items: modelManager.models.map((Model model) {
                                       return PopupMenuItem<Model>(
                                         value: model,
                                         padding: const EdgeInsets.all(12),
                                         child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text(model.displayName),
                                             Text(
                                               model.subtitle,
-                                              style: theme.textTheme.bodySmall
-                                                  ?.copyWith(
-                                                    color: theme
-                                                        .colorScheme
-                                                        .onSurfaceVariant,
-                                                  ),
+                                              style: theme.textTheme.bodySmall?.copyWith(
+                                                color: theme.colorScheme.onSurfaceVariant,
+                                              ),
                                             ),
                                           ],
                                         ),
@@ -359,9 +359,7 @@ class _MainUIState extends State<MainUI> {
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Text(
-                                        modelManager.selectedModel.displayName,
-                                      ),
+                                      Text(modelManager.selectedModel.displayName),
                                       const SizedBox(width: 6),
                                       const Icon(Icons.arrow_drop_down),
                                     ],
@@ -384,13 +382,9 @@ class _MainUIState extends State<MainUI> {
                     // An animated switcher to transition between the welcome screen and the chat UI.
                     child: AnimatedSwitcher(
                       duration: 200.ms,
-                      transitionBuilder:
-                          (Widget child, Animation<double> animation) {
-                            return FadeTransition(
-                              opacity: animation,
-                              child: child,
-                            );
-                          },
+                      transitionBuilder: (Widget child, Animation<double> animation) {
+                        return FadeTransition(opacity: animation, child: child);
+                      },
                       // If there is no active chat, show the welcome UI.
                       child: _activeChat == null
                           ? const WelcomeUI()
@@ -404,10 +398,9 @@ class _MainUIState extends State<MainUI> {
                                 setState(() {
                                   if (_activeChat != null) {
                                     try {
-                                      final newActiveChat = _chatHistory
-                                          .firstWhere(
-                                            (c) => c.id == _activeChat!.id,
-                                          );
+                                      final newActiveChat = _chatHistory.firstWhere(
+                                        (c) => c.id == _activeChat!.id,
+                                      );
                                       _activeChat = newActiveChat;
                                     } catch (e) {
                                       _activeChat = null;
@@ -438,6 +431,8 @@ class _MainUIState extends State<MainUI> {
               onArchiveChat: _archiveChat,
               onRenameChat: _renameChat,
               onExportChat: _exportChat,
+              onPopupMenuOpened: _onPopupMenuOpened,
+              onPopupMenuClosed: _onPopupMenuClosed,
             ),
           ),
         ],

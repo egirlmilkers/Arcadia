@@ -38,6 +38,12 @@ class SideNav extends StatefulWidget {
   /// A callback function that is called when the user exports a chat.
   final Function(ArcadiaChat) onExportChat;
 
+  /// A callback function that is called when a popup menu is opened.
+  final VoidCallback onPopupMenuOpened;
+
+  /// A callback function that is called when a popup menu is closed.
+  final VoidCallback onPopupMenuClosed;
+
   /// The currently selected chat session.
   final ArcadiaChat? selectedChat;
 
@@ -53,6 +59,8 @@ class SideNav extends StatefulWidget {
     required this.onArchiveChat,
     required this.onRenameChat,
     required this.onExportChat,
+    required this.onPopupMenuOpened,
+    required this.onPopupMenuClosed,
     this.selectedChat,
   });
 
@@ -82,10 +90,7 @@ class _SideNavState extends State<SideNav> {
             ),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
             TextButton(
               onPressed: () {
                 widget.onRenameChat(chat, controller.text);
@@ -115,10 +120,7 @@ class _SideNavState extends State<SideNav> {
           maxWidth: 280,
           alignment: Alignment.centerLeft,
           child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16.0,
-              vertical: 8.0,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -127,11 +129,7 @@ class _SideNavState extends State<SideNav> {
                   icon: AnimatedRotation(
                     duration: 200.ms,
                     turns: widget.isPinned ? 0.0 : 0.25,
-                    child: Icon(
-                      widget.isPinned
-                          ? Icons.push_pin
-                          : Icons.push_pin_outlined,
-                    ),
+                    child: Icon(widget.isPinned ? Icons.push_pin : Icons.push_pin_outlined),
                   ),
                   onPressed: widget.onToggle,
                 ),
@@ -168,6 +166,8 @@ class _SideNavState extends State<SideNav> {
                             onArchive: () => widget.onArchiveChat(chat),
                             onDelete: () => widget.onDeleteChat(chat),
                             onExport: () => widget.onExportChat(chat),
+                            onPopupMenuOpened: widget.onPopupMenuOpened,
+                            onPopupMenuClosed: widget.onPopupMenuClosed,
                           );
                         },
                         separatorBuilder: (context, index) {
@@ -190,11 +190,9 @@ class _SideNavState extends State<SideNav> {
                 CustomNavButton(
                   isExpanded: widget.isExpanded,
                   onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const SettingsPage(),
-                      ),
-                    );
+                    Navigator.of(
+                      context,
+                    ).push(MaterialPageRoute(builder: (context) => const SettingsPage()));
                   },
                   icon: Icons.settings,
                   label: "Settings",
@@ -232,6 +230,12 @@ class ChatListTile extends StatefulWidget {
   /// A callback function that is called when the user chooses to export the chat.
   final VoidCallback onExport;
 
+  /// A callback function that is called when the popup menu is opened.
+  final VoidCallback onPopupMenuOpened;
+
+  /// A callback function that is called when the popup menu is closed.
+  final VoidCallback onPopupMenuClosed;
+
   const ChatListTile({
     super.key,
     required this.chat,
@@ -241,6 +245,8 @@ class ChatListTile extends StatefulWidget {
     required this.onArchive,
     required this.onDelete,
     required this.onExport,
+    required this.onPopupMenuOpened,
+    required this.onPopupMenuClosed,
   });
 
   @override
@@ -255,9 +261,7 @@ class _ChatListTileState extends State<ChatListTile> {
     final theme = Theme.of(context);
     final showPopupMenu = _isHovering || widget.isSelected;
 
-    final Color? bgColor = widget.isSelected
-        ? theme.colorScheme.onPrimary
-        : null;
+    final Color? bgColor = widget.isSelected ? theme.colorScheme.onPrimary : null;
     final Color? fgColor = widget.isSelected ? theme.colorScheme.primary : null;
 
     // Use a MouseRegion to detect when the user is hovering over the tile.
@@ -268,9 +272,7 @@ class _ChatListTileState extends State<ChatListTile> {
         leading: const Icon(Icons.chat_bubble_rounded, size: 18),
         title: Text(
           widget.chat.title,
-          style: const TextStyle(
-            fontVariations: [FontVariation('wght', 500.0)],
-          ),
+          style: const TextStyle(fontVariations: [FontVariation('wght', 500.0)]),
         ),
         onTap: widget.onTap,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -286,12 +288,13 @@ class _ChatListTileState extends State<ChatListTile> {
           child: PopupMenuButton<String>(
             offset: const Offset(40, 0),
             menuPadding: EdgeInsets.zero,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16.0),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.0)),
             clipBehavior: Clip.antiAlias,
             color: bgColor,
+            onOpened: widget.onPopupMenuOpened,
+            onCanceled: widget.onPopupMenuClosed,
             onSelected: (value) {
+              widget.onPopupMenuClosed();
               if (value == 'rename') {
                 widget.onRename();
               } else if (value == 'archive') {
@@ -404,12 +407,7 @@ class CustomNavButton extends StatelessWidget {
           Icon(icon),
           if (isExpanded) ...[
             const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                fontVariations: [FontVariation('wght', 550.0)],
-              ),
-            ),
+            Text(label, style: const TextStyle(fontVariations: [FontVariation('wght', 550.0)])),
           ],
         ],
       ),

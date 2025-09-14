@@ -23,15 +23,23 @@ void main() async {
   await windowManager.ensureInitialized();
   await ArcadiaLog().configure();
 
+  WindowOptions windowOptions = const WindowOptions(
+    center: true,
+    minimumSize: Size(640, 480),
+  );
+
   final packageInfo = await PackageInfo.fromPlatform();
   appVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
 
   if (Platform.isWindows) {
     // fixes clipboard history flutter bug
     WindowsInjector.instance.injectKeyData();
-
-    WindowManager.instance.setMinimumSize(const Size(640, 480));
   }
+
+  windowManager.waitUntilReadyToShow(windowOptions, () async {
+    await windowManager.show();
+    await windowManager.focus();
+  });
 
   runApp(
     MultiProvider(
@@ -46,9 +54,7 @@ void main() async {
 
 // ========== TODO ==========
 // - streaming output & thinking (removing dead chats AND reverting)
-// - boot in center of screen
 
-// - generation & safety settings will fail with other non-google models
 // - refresh data
 // - chat popup menu doesnt work if not pinned
 // - generate even if switching tabs
@@ -101,7 +107,7 @@ class ChatMessage {
     String? id,
     DateTime? createdAt,
   }) : id = id ?? const Uuid().v4(),
-      createdAt = createdAt ?? DateTime.now();
+       createdAt = createdAt ?? DateTime.now();
 
   /// Creates a [ChatMessage] from a JSON object.
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
