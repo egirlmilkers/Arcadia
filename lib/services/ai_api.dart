@@ -41,7 +41,7 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
       requestCancelled = true;
       client.close();
       receivePort.close();
-      ArcadiaLog().info('Content generation cancelled by user.');
+      print('Content generation cancelled by user.');
     }
   });
 
@@ -54,7 +54,7 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
     final firstUserIndex = history.indexWhere((m) => m.isUser);
     if (firstUserIndex == -1) {
       mainSendPort.send("Error: Cannot send a message without user input.");
-      ArcadiaLog().warning('Attempted to send a message without user input.');
+      print('Attempted to send a message without user input.');
       return;
     }
     history = history.sublist(firstUserIndex);
@@ -81,16 +81,13 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
                   });
                 }
               } catch (e) {
-                // Logs an error if an attachment cannot be processed.
-                ArcadiaLog().error('Error processing attachment: $attachmentPath', e);
+                print('Error processing attachment: $attachmentPath. Error: $e');
               }
             }
           }
-
           return {'role': message.isUser ? 'user' : 'model', 'parts': parts};
         }),
       ),
-      // prepare safety settings
       if (['vertex', 'gemini'].contains(src))
         'safetySettings': [
           {'category': 'HARM_CATEGORY_HARASSMENT', 'threshold': 'BLOCK_NONE'},
@@ -99,74 +96,159 @@ void _generateContentIsolate(Map<String, dynamic> params) async {
           {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold': 'BLOCK_NONE'},
           {'category': 'HARM_CATEGORY_CIVIC_INTEGRITY', 'threshold': 'BLOCK_NONE'},
         ],
-
-      // thinking config
       if (canThink && ['vertex', 'gemini'].contains(src))
         'generationConfig': {
           'thinkingConfig': {'thinkingBudget': -1, 'includeThoughts': true},
         },
     };
 
-    ArcadiaLog().info(body.toString());
-
-    // // Sends the API request.
-    final response = await client.post(
-      url,
-      headers: {
+    if (stream) {
+      final request = http.Request('POST', url);
+      request.headers.addAll({
         if (src == 'gemini') 'X-goog-api-key': apiKey,
         if (src != 'gemini') 'Authorization': 'Bearer $apiKey',
         'Content-Type': 'application/json',
-      },
-      body: jsonEncode(body),
-    );
+      });
+      request.body = jsonEncode(body);
 
-    // Processes the API response.
-    if (response.statusCode == 200) {
-      final jsonResponse = jsonDecode(response.body);
-      final candidates = jsonResponse['candidates'];
-      if (candidates != null && candidates.isNotEmpty) {
-        final content = candidates[0]['content'];
-        if (content != null && content['parts'] != null && content['parts'].isNotEmpty) {
-          final List<dynamic> parts = content['parts'];
-          String thoughtSummary = '';
-          String finalAnswer = '';
+      final response = await client.send(request);
 
-          // Separates the thinking process from the final answer.
-          for (final part in parts) {
-            if (part['thought'] == true) {
-              thoughtSummary += part['text'];
-            } else {
-              finalAnswer += part['text'];
+      // ▼▼▼ ROBUST STREAM PARSING LOGIC ▼▼▼
+      var buffer = '';
+      response.stream
+          .transform(utf8.decoder)
+          .listen(
+            (chunk) {
+              buffer += chunk;
+              var processedLength = 0;
+              while (true) {
+                final objectStartIndex = buffer.indexOf('{', processedLength);
+                if (objectStartIndex == -1) break;
+
+                var braceDepth = 0;
+                int? objectEndIndex;
+                for (var i = objectStartIndex; i < buffer.length; i++) {
+                  if (buffer[i] == '{') {
+                    braceDepth++;
+                  } else if (buffer[i] == '}') {
+                    braceDepth--;
+                    if (braceDepth == 0) {
+                      objectEndIndex = i;
+                      break;
+                    }
+                  }
+                }
+
+                if (objectEndIndex != null) {
+                  final objectString = buffer.substring(objectStartIndex, objectEndIndex + 1);
+                  try {
+                    final jsonResponse = jsonDecode(objectString);
+                    final candidates = jsonResponse['candidates'];
+                    if (candidates != null && candidates.isNotEmpty) {
+                      final content = candidates[0]['content'];
+                      if (content != null &&
+                          content['parts'] != null &&
+                          content['parts'].isNotEmpty) {
+                        final List<dynamic> parts = content['parts'];
+                        var thoughtSummary = '';
+                        var finalAnswer = '';
+
+                        for (final part in parts) {
+                          if (part.containsKey('text')) {
+                            final isThought = (part['thought'] ?? false) as bool;
+                            if (isThought) {
+                              thoughtSummary += part['text'];
+                            } else {
+                              finalAnswer += part['text'];
+                            }
+                          }
+                        }
+                        if (finalAnswer.isNotEmpty || thoughtSummary.isNotEmpty) {
+                          mainSendPort.send({
+                            'text': finalAnswer,
+                            'thinkingProcess': thoughtSummary,
+                          });
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    print('Error decoding JSON object: $objectString, Error: $e');
+                  }
+                  processedLength = objectEndIndex + 1;
+                } else {
+                  break; // Incomplete object, wait for more data.
+                }
+              }
+              if (processedLength > 0) {
+                buffer = buffer.substring(processedLength);
+              }
+            },
+            onDone: () {
+              mainSendPort.send('done');
+              client.close();
+              receivePort.close();
+            },
+            onError: (e) {
+              mainSendPort.send('Error: $e');
+              client.close();
+              receivePort.close();
+            },
+          );
+    } else {
+      // Non-streaming logic remains the same
+      final response = await client.post(
+        url,
+        headers: {
+          if (src == 'gemini') 'X-goog-api-key': apiKey,
+          if (src != 'gemini') 'Authorization': 'Bearer $apiKey',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(body),
+      );
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        final candidates = jsonResponse['candidates'];
+        if (candidates != null && candidates.isNotEmpty) {
+          final content = candidates[0]['content'];
+          if (content != null && content['parts'] != null && content['parts'].isNotEmpty) {
+            final List<dynamic> parts = content['parts'];
+            String thoughtSummary = '';
+            String finalAnswer = '';
+
+            for (final part in parts) {
+              if (part.containsKey('text')) {
+                final isThought = (part['thought'] ?? false) as bool;
+                if (isThought) {
+                  thoughtSummary += part['text'];
+                } else {
+                  finalAnswer += part['text'];
+                }
+              }
             }
+            mainSendPort.send({'text': finalAnswer, 'thinkingProcess': thoughtSummary});
+          } else {
+            mainSendPort.send('Error: Invalid response structure from API.');
           }
-
-          // Sends the successful response back to the main isolate.
-          mainSendPort.send({'text': finalAnswer, 'thinkingProcess': thoughtSummary});
         } else {
           mainSendPort.send('Error: Invalid response structure from API.');
-          ArcadiaLog().error('Invalid response structure: "parts" field is missing or empty.');
         }
       } else {
-        mainSendPort.send('Error: Invalid response structure from API.');
-        ArcadiaLog().error('Invalid response structure: "candidates" field is missing or empty.');
+        mainSendPort.send('Error: ${response.statusCode} - \n${response.body}');
       }
-    } else {
-      // Sends an error message if the API call was unsuccessful.
-      mainSendPort.send('Error: ${response.statusCode} - \n${response.body}');
-      ArcadiaLog().error('API error: ${response.statusCode} - \n${response.body}');
     }
   } catch (e) {
-    // Handles any other exceptions that may occur.
     if (requestCancelled) {
       mainSendPort.send(AiApi.cancelledResponse);
     } else {
       mainSendPort.send('Error making API call: $e');
-      ArcadiaLog().error('Error in _generateContentIsolate', e, StackTrace.current);
+      print('Error in _generateContentIsolate: $e');
     }
   } finally {
-    // Cleans up resources.
-    client.close();
-    receivePort.close();
+    if (!stream) {
+      client.close();
+      receivePort.close();
+    }
   }
 }
 
@@ -202,20 +284,20 @@ class AiApi {
   /// - [messages]: The list of [ChatMessage]s to send to the model.
   /// - [url]: The URL of the model to use for content generation.
   /// - [thinking]: Whether the model can use the thinking feature.
-  Future<Map<String, dynamic>> generateContent(
+  Stream<Map<String, dynamic>> generateContent(
     List<ChatMessage> messages,
     String url,
     String src, [
     bool? thinking = false,
     bool? stream = false,
-  ]) async {
-    final completer = Completer<Map<String, dynamic>>();
+  ]) {
+    final controller = StreamController<Map<String, dynamic>>();
     final receivePort = ReceivePort();
 
     final messagesAsJson = messages.map((m) => m.toJson()).toList();
 
     // Spawns the isolate for content generation.
-    _isolate = await Isolate.spawn(_generateContentIsolate, {
+    Isolate.spawn(_generateContentIsolate, {
       'logger': ArcadiaLog(),
       'sendPort': receivePort.sendPort,
       'apiKey': apiKey,
@@ -224,6 +306,8 @@ class AiApi {
       'thinking': thinking,
       'src': src,
       'stream': stream,
+    }).then((isolate) {
+      _isolate = isolate;
     });
 
     // Listens for data from the isolate.
@@ -232,23 +316,29 @@ class AiApi {
         _sendPort = data;
       } else if (data is String && data.startsWith('Error:')) {
         // Handles error messages from the isolate.
-        completer.complete({'error': data});
+        controller.add({'error': data});
+        controller.close();
         ArcadiaLog().error('Content generation error: $data');
         _cleanup();
       } else if (data is String && data == cancelledResponse) {
         // Handles cancellation.
-        completer.complete({'text': cancelledResponse});
+        controller.add({'text': cancelledResponse});
+        controller.close();
         ArcadiaLog().info('Content generation was cancelled.');
         _cleanup();
       } else if (data is Map) {
         // Handles successful responses.
-        completer.complete(Map<String, dynamic>.from(data));
-        ArcadiaLog().info('Content generated successfully.');
+        controller.add(Map<String, dynamic>.from(data));
+        stream ?? false
+            ? ArcadiaLog().info('Content stream received successfully.')
+            : ArcadiaLog().info('Content generation received successfully.');
+      } else if (data == 'done') {
+        controller.close();
         _cleanup();
       }
     });
 
-    return completer.future;
+    return controller.stream;
   }
 
   /// Cancels the ongoing content generation.

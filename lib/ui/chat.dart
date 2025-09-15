@@ -81,21 +81,17 @@ class _ChatUIState extends State<ChatUI> {
   /// title generation for new chats.
   void _sendMessage() async {
     final text = _textController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty && _attachments.isEmpty) return;
 
     final originalMessage = text;
     final originalAttachments = List<PlatformFile>.from(_attachments);
 
     _textController.clear();
-    setState(() {
-      _attachments.clear();
-    });
+    setState(() => _attachments.clear());
 
-    // Copy attachments to a permanent location to ensure they are not lost.
     final List<String> attachmentPaths = [];
     if (originalAttachments.isNotEmpty) {
       final attachmentsDir = await getArcadiaDocuments('attachments');
-
       for (final file in originalAttachments) {
         if (file.path != null) {
           final newPath = p.join(attachmentsDir.path, file.name);
@@ -106,7 +102,6 @@ class _ChatUIState extends State<ChatUI> {
       ArcadiaLog().info('Copied ${attachmentPaths.length} attachments to permanent storage.');
     }
 
-    // Optimistically update the UI with the user's message.
     setState(() {
       widget.chatSession.messages.add(
         ChatMessage(text: text, isUser: true, attachments: attachmentPaths),
@@ -115,39 +110,29 @@ class _ChatUIState extends State<ChatUI> {
     });
     _scrollToBottom();
 
-    // A new chat is defined by having only one message from the user.
     final bool isNewChat = widget.chatSession.messages.length == 1;
 
-    // A local function to revert the UI if the message fails to send.
     void revertGivenPrompt() {
       setState(() {
-        widget.chatSession.messages.removeLast();
+        if (widget.chatSession.messages.isNotEmpty && widget.chatSession.messages.last.isUser) {
+          widget.chatSession.messages.removeLast();
+        }
         _textController.text = originalMessage;
         _attachments = originalAttachments;
       });
-      ArcadiaLog().warning('Reverted given prompt.');
+      ArcadiaLog().info('Reverted given prompt.');
     }
 
     try {
-      // get api keys given in settings and fail if non-existent
       final apiKey = await getApiKey(widget.selectedModel.apiSrc);
       if (apiKey == null || apiKey.isEmpty) {
         throw Exception("API key not set. Please set it in settings.");
       }
 
-      // process our REST API with these api keys
       final contentService = AiApi(apiKey: apiKey);
       _aiApi = contentService;
 
-      ArcadiaLog().dprint(widget.selectedModel.url, 'Prompt URL');
-      ArcadiaLog().dprint(widget.selectedModel.apiSrc, 'API Source');
-      ArcadiaLog().dprint(widget.selectedModel.thinking.toString(), 'Can Think');
-
-      // If it's a new chat, generate a title.
       if (isNewChat) {
-        ArcadiaLog().info('New chat detected. Generating title.');
-
-        // we use gemini to get a title
         final titleApiKey = await getApiKey('gemini');
         if (titleApiKey == null || titleApiKey.isEmpty) {
           throw Exception(
@@ -155,70 +140,94 @@ class _ChatUIState extends State<ChatUI> {
           );
         }
         final titleService = AiApi(apiKey: titleApiKey);
-
         final titlePrompt =
             'Generate a short, concise header (5 words max) for an ai chat started with this user query:\n\n$originalMessage\n\n[Please do not provide anything else, just the 5 word title. This will show up in a list of multiple user chat sessions so it needs to be easily distiniguishable without the need to open the chat.]';
 
-        // manual input for the title
-        final Map<String, dynamic> titleResponse = await titleService.generateContent(
-          [ChatMessage(text: titlePrompt, isUser: true)],
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest',
-          'gemini',
-        );
+        final titleResponse = await titleService
+            .generateContent(
+              [ChatMessage(text: titlePrompt, isUser: true)],
+              'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest',
+              'gemini',
+            )
+            .first;
 
         if (titleResponse['error'] == null) {
-          setState(() {
-            widget.chatSession.title = titleResponse['text'].replaceAll('"', '').trim();
-          });
+          setState(
+            () => widget.chatSession.title = titleResponse['text'].replaceAll('"', '').trim(),
+          );
           ArcadiaLog().info('Generated new chat title: ${widget.chatSession.title}');
         } else {
-          ArcadiaLog().warning('Failed to generate chat title.');
+          ArcadiaLog().error('Failed to generate chat title.');
         }
       }
 
-      // Generate content.
-      Map<String, dynamic> modelResponse = await contentService.generateContent(
+      final stream = contentService.generateContent(
         widget.chatSession.messages,
         widget.selectedModel.url,
         widget.selectedModel.apiSrc,
         widget.selectedModel.thinking,
+        widget.selectedModel.stream,
       );
 
-      // Handle user cancellation.
-      if (modelResponse['text'] == AiApi.cancelledResponse) {
-        revertGivenPrompt();
-        ArcadiaLog().info('Message sending cancelled by user.');
-        return;
-      }
-
-      // Handle API errors.
-      if (modelResponse['error'] != null) {
-        ArcadiaLog().dprint(modelResponse.toString(), 'Model Response');
-        throw Exception(modelResponse['error']);
-      }
-
-      // On success, update the UI with the model's response.
       setState(() {
-        widget.chatSession.messages.add(
-          ChatMessage(
-            text: modelResponse['text'],
-            isUser: false,
-            thinkingProcess: modelResponse['thinkingProcess'],
-          ),
-        );
+        widget.chatSession.messages.add(ChatMessage(text: '', isUser: false));
       });
-      _scrollToBottom();
+
+      bool isFirstChunk = true;
+
+      String accumulatedText = '';
+      String accumulatedThinking = '';
+
+      await for (final response in stream) {
+        if (response['text'] == AiApi.cancelledResponse) {
+          setState(() {
+            if (widget.chatSession.messages.isNotEmpty &&
+                !widget.chatSession.messages.last.isUser &&
+                widget.chatSession.messages.last.text.isEmpty) {
+              widget.chatSession.messages.removeLast();
+            }
+          });
+          ArcadiaLog().info('Message sending cancelled by user.');
+          return;
+        }
+
+        if (response['error'] != null) {
+          throw Exception(response['error']);
+        }
+
+        if (isFirstChunk) {
+          if (isNewChat) {
+            await _chatHistoryService.saveChat(widget.chatSession);
+          }
+          isFirstChunk = false;
+        }
+
+        accumulatedText += response['text'] ?? '';
+        accumulatedThinking += response['thinkingProcess'] ?? '';
+
+        setState(() {
+          // Check if the last message is an AI message before updating
+          if (widget.chatSession.messages.isNotEmpty && !widget.chatSession.messages.last.isUser) {
+            final lastMessage = widget.chatSession.messages.last;
+            lastMessage.text = accumulatedText;
+            lastMessage.thinkingProcess = accumulatedThinking.isNotEmpty
+                ? accumulatedThinking
+                : null;
+          }
+        });
+        _scrollToBottom();
+      }
+
+      // Diagnostic print after loop
+      ArcadiaLog().info('--- STREAM FINISHED ---');
 
       await _chatHistoryService.saveChat(widget.chatSession);
       if (isNewChat) {
         widget.onNewMessage?.call(widget.chatSession.title);
       }
     } catch (e, s) {
-      // give the user back their prompt if something fails
       revertGivenPrompt();
-      ArcadiaLog().error('Error sending message', e, s);
-
-      // Show an error toast to the user.
+      ArcadiaLog().error('Error sending message: $e\n$s');
       toastification.show(
         type: ToastificationType.error,
         style: ToastificationStyle.flatColored,
@@ -226,19 +235,13 @@ class _ChatUIState extends State<ChatUI> {
         description: Text(e.toString().replaceFirst("Exception: ", "")),
         alignment: Alignment.bottomCenter,
         padding: const EdgeInsets.only(left: 8, right: 8),
-        autoCloseDuration: const Duration(seconds: 4),
-        animationBuilder: (context, animation, alignment, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        borderRadius: BorderRadius.circular(100.0),
+        autoCloseDuration: const Duration(seconds: 10),
+        borderRadius: BorderRadius.circular(20),
         showProgressBar: true,
         dragToClose: true,
       );
     } finally {
-      // Ensure the loading indicator is turned off.
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
@@ -257,15 +260,15 @@ class _ChatUIState extends State<ChatUI> {
   /// then calls the Gemini service to generate a new response.
   void _regenerateResponse(int messageIndex) async {
     if (messageIndex == 0) {
-      // Cannot regenerate the first message in a chat.
       toastification.show(
         type: ToastificationType.warning,
         style: ToastificationStyle.flatColored,
-        title: const Text("Cannot regenerate the first message."),
+        title: const Text("Cannot regenerate first message"),
+        description: const Text("Please edit the message instead."),
         alignment: Alignment.bottomCenter,
         padding: const EdgeInsets.only(left: 8, right: 8),
-        autoCloseDuration: const Duration(seconds: 4),
-        borderRadius: BorderRadius.circular(100.0),
+        autoCloseDuration: const Duration(seconds: 5),
+        borderRadius: BorderRadius.circular(20),
         showProgressBar: true,
         dragToClose: true,
       );
@@ -274,7 +277,6 @@ class _ChatUIState extends State<ChatUI> {
 
     setState(() {
       _isLoading = true;
-      // Remove the AI message and any subsequent messages.
       widget.chatSession.messages.removeRange(messageIndex, widget.chatSession.messages.length);
     });
     _scrollToBottom();
@@ -289,40 +291,61 @@ class _ChatUIState extends State<ChatUI> {
       final contentService = AiApi(apiKey: apiKey);
       _aiApi = contentService;
 
-      final modelResponse = await contentService.generateContent(
+      final stream = contentService.generateContent(
         widget.chatSession.messages,
         widget.selectedModel.url,
         widget.selectedModel.apiSrc,
         widget.selectedModel.thinking,
+        widget.selectedModel.stream,
       );
 
-      // Handle user cancellation.
-      if (modelResponse['text'] == AiApi.cancelledResponse) {
-        ArcadiaLog().info('Response regeneration cancelled by user.');
-        return;
-      }
-
-      // Handle API errors.
-      if (modelResponse['error'] != null) {
-        throw Exception(modelResponse['error']);
-      }
-
-      // On success, update the UI with the new response.
       setState(() {
-        widget.chatSession.messages.add(
-          ChatMessage(
-            text: modelResponse['text'],
-            isUser: false,
-            thinkingProcess: modelResponse['thinkingProcess'],
-          ),
-        );
+        widget.chatSession.messages.add(ChatMessage(text: '', isUser: false));
       });
-      _scrollToBottom();
 
+      String accumulatedText = '';
+      String accumulatedThinking = '';
+
+      await for (final response in stream) {
+        if (response['text'] == AiApi.cancelledResponse) {
+          setState(() {
+            if (widget.chatSession.messages.isNotEmpty &&
+                !widget.chatSession.messages.last.isUser &&
+                widget.chatSession.messages.last.text.isEmpty) {
+              widget.chatSession.messages.removeLast();
+            }
+          });
+
+          ArcadiaLog().info('Response generation cancelled by user.');
+          return;
+        }
+
+        if (response['error'] != null) {
+          throw Exception(response['error']);
+        }
+
+        accumulatedText += response['text'] ?? '';
+        accumulatedThinking += response['thinkingProcess'] ?? '';
+
+        setState(() {
+          if (widget.chatSession.messages.isNotEmpty && !widget.chatSession.messages.last.isUser) {
+            final lastMessage = widget.chatSession.messages.last;
+            lastMessage.text = accumulatedText;
+            lastMessage.thinkingProcess = accumulatedThinking.isNotEmpty
+                ? accumulatedThinking
+                : null;
+          }
+        });
+        _scrollToBottom();
+      }
+
+      // Diagnostic print after loop
+      ArcadiaLog().info('--- STREAM FINISHED ---');
+
+      // Save the chat after the stream is complete.
       await _chatHistoryService.saveChat(widget.chatSession);
     } catch (e, s) {
-      ArcadiaLog().error('Error regenerating response', e, s);
-      // Show an error toast to the user.
+      ArcadiaLog().error('Error regenerating response: $e\n$s');
       toastification.show(
         type: ToastificationType.error,
         style: ToastificationStyle.flatColored,
@@ -330,18 +353,13 @@ class _ChatUIState extends State<ChatUI> {
         description: Text(e.toString().replaceFirst("Exception: ", "")),
         alignment: Alignment.bottomCenter,
         padding: const EdgeInsets.only(left: 8, right: 8),
-        autoCloseDuration: const Duration(seconds: 4),
-        animationBuilder: (context, animation, alignment, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        borderRadius: BorderRadius.circular(100.0),
+        autoCloseDuration: const Duration(seconds: 10),
+        borderRadius: BorderRadius.circular(20),
         showProgressBar: true,
         dragToClose: true,
       );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
@@ -366,10 +384,6 @@ class _ChatUIState extends State<ChatUI> {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // The main chat area, which is expandable.
-        // Expanded(
-        // A listener to handle scroll events for a smoother experience.
-        // child:
         Listener(
           behavior: HitTestBehavior.opaque,
           onPointerSignal: (event) {
@@ -395,7 +409,7 @@ class _ChatUIState extends State<ChatUI> {
                     constraints: const BoxConstraints(maxWidth: 900),
                     // A scrollable column of all messages in the chat session.
                     child: Padding(
-                      padding: EdgeInsetsGeometry.only(bottom: 65),
+                      padding: const EdgeInsets.only(bottom: 65),
                       child: SingleChildScrollView(
                         controller: _scrollController,
                         physics: const ClampingScrollPhysics(),
@@ -446,7 +460,6 @@ class _ChatUIState extends State<ChatUI> {
                   ),
                 ),
         ),
-        //),
         // The text input area at the bottom of the screen.
         _buildPromptInputArea(),
       ],
@@ -855,12 +868,12 @@ class _MessageBubbleState extends State<MessageBubble> with AutomaticKeepAliveCl
                   // The main content of the message.
                   Flexible(
                     child: Column(
-                      spacing: 8,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Display the thinking process if it exists.
                         if (!isUser && widget.message.thinkingProcess != null) ...[
                           _buildThinkingProcess(context),
+                          const SizedBox(height: 8.0),
                         ],
                         // The message text, rendered as Markdown.
                         SelectionArea(
@@ -931,7 +944,6 @@ class _MessageBubbleState extends State<MessageBubble> with AutomaticKeepAliveCl
       width: _isSummaryExpanded ? 600 : 170,
       child: Material(
         // material so the colors dont clash with the expansion material
-        animateColor: true,
         color: _isSummaryExpanded
             ? theme.colorScheme.inversePrimary
             : theme.colorScheme.surfaceContainerLow,
@@ -1074,12 +1086,12 @@ class _MessageBubbleState extends State<MessageBubble> with AutomaticKeepAliveCl
             maxLines: null,
             decoration: const InputDecoration(
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 14),
+              contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             ),
           ),
+
           // Action buttons for saving or cancelling the edit.
           Row(
-            spacing: 8,
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               TextButton(

@@ -26,6 +26,9 @@ class Model {
   /// Whether the model is capable of thinking.
   final bool thinking;
 
+  /// Whether the model supports streaming.
+  final bool stream;
+
   /// The name of the api key reference.
   final String apiSrc;
 
@@ -35,6 +38,7 @@ class Model {
     required this.name,
     required this.url,
     this.thinking = false,
+    this.stream = false,
     required this.apiSrc,
   });
 
@@ -46,6 +50,7 @@ class Model {
       name: json['name'],
       url: json['url'],
       thinking: json['thinking'] ?? false,
+      stream: json['stream'] ?? false,
       apiSrc: json['src'],
     );
   }
@@ -72,14 +77,7 @@ class ModelManager extends ChangeNotifier {
       _selectedModel ??
       (_models.isNotEmpty
           ? _models.first
-          : Model(
-              displayName: '',
-              subtitle: '',
-              name: '',
-              url: '',
-              thinking: false,
-              apiSrc: '',
-            ));
+          : Model(displayName: '', subtitle: '', name: '', url: '', thinking: false, apiSrc: ''));
 
   /// Loads the models and settings from their respective sources.
   Future<void> _load() async {
