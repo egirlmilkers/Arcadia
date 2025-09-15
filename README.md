@@ -126,4 +126,4 @@ Contributions are welcome! If you have an idea for a new feature, find a bug, or
 
 ## 📄 License
 
-Pending...
+This project is licensed under the GNU GPLv3 License - see the [LICENSE.md](LICENSE.md) file for details.

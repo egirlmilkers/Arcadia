@@ -93,7 +93,7 @@ BEGIN
             VALUE "FileDescription", "Arcadia" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "Arcadia" "\0"
-            VALUE "LegalCopyright", "Copyright © 2025 EGirlMilkers (SoniaNvm) All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright © 2025 EGirlMilkers (SoniaNvm)" "\0"
             VALUE "OriginalFilename", "Arcadia.exe" "\0"
             VALUE "ProductName", "Arcadia" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"

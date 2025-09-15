@@ -107,7 +107,7 @@ class ChatMessage {
     String? id,
     DateTime? createdAt,
   }) : id = id ?? const Uuid().v4(),
-       createdAt = createdAt ?? DateTime.now();
+      createdAt = createdAt ?? DateTime.now();
 
   /// Creates a [ChatMessage] from a JSON object.
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
