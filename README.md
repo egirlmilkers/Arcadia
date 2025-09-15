@@ -4,9 +4,9 @@
   
 **A sleek, cross-platform generative AI chat client built with Flutter, inspired by the Gemini UI.**
 
-![GitHub Release](https://img.shields.io/github/v/release/egirlmilkers/Arcadia?display_name=release)
-![GitHub Nightly](https://img.shields.io/github/v/release/egirlmilkers/Arcadia?include_prereleases&display_name=release&label=nightly)
-![Flutter](https://img.shields.io/badge/Flutter%203.x-%2302569B.svg?&logo=Flutter&logoColor=white)
+[![GitHub Release](https://img.shields.io/github/v/release/egirlmilkers/Arcadia?display_name=tag&style=flat-square&color=mediumseagreen)](https://github.com/egirlmilkers/Arcadia/releases/latest)
+[![GitHub Nightly](https://img.shields.io/github/v/release/egirlmilkers/Arcadia?include_prereleases&display_name=tag&style=flat-square&label=nightly&color=royalblue)](https://github.com/egirlmilkers/Arcadia/releases)
+[![Flutter](https://img.shields.io/badge/Flutter%203.x-%23027dfd.svg?style=flat-square&logo=Flutter&logoColor=white)](https://docs.flutter.dev/get-started/install)
 
 </div>
 
